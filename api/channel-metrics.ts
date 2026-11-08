@@ -211,24 +211,104 @@ async function tiktokLive(request: Request): Promise<{ channel: ChannelMetrics; 
   }
 }
 
+function numberish(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).reduce<number>((sum, item) => sum + numberish(item), 0);
+  }
+  return 0;
+}
+
 async function insightSum(
   path: string,
   token: string,
   metric: string,
+  from?: string,
+  to?: string,
 ): Promise<number | null> {
   const url = new URL(`https://graph.facebook.com/${GRAPH}${path}`);
   url.searchParams.set("metric", metric);
   url.searchParams.set("period", "day");
   url.searchParams.set("access_token", token);
+  if (from) url.searchParams.set("since", from);
+  if (to) url.searchParams.set("until", to);
   const data = (await (await fetch(url)).json()) as {
-    data?: Array<{ values?: Array<{ value?: number }> }>;
+    data?: Array<{ values?: Array<{ value?: unknown }> }>;
+    error?: { message?: string };
   };
+  if (data.error?.message) return null;
   const values = data.data?.[0]?.values || [];
   if (!values.length) return null;
-  return values.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const total = values.reduce((sum, item) => sum + numberish(item.value), 0);
+  return total;
 }
 
-async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; instagram: ChannelMetrics }> {
+async function facebookEarnings(
+  pageId: string,
+  token: string,
+  from: string,
+  to: string,
+): Promise<{ amount: number | null; note: string }> {
+  const metrics = [
+    "page_daily_video_ad_break_earnings_by_crosspost_status",
+    "post_video_ad_break_earnings",
+  ];
+  for (const metric of metrics) {
+    const raw = await insightSum(`/${pageId}/insights`, token, metric, from, to);
+    if (raw === null) continue;
+    // Meta documents several ad-break earnings metrics in U.S. cents.
+    const amount = raw > 1000 ? raw / 100 : raw;
+    return {
+      amount,
+      note: "Facebook in-stream / ad-break estimate for this Page (last 28 days).",
+    };
+  }
+
+  // Fallback: sum lifetime earnings on recent Page videos (cents → major units).
+  try {
+    const listUrl = new URL(`https://graph.facebook.com/${GRAPH}/${pageId}/videos`);
+    listUrl.searchParams.set("fields", "id");
+    listUrl.searchParams.set("limit", "20");
+    listUrl.searchParams.set("access_token", token);
+    const list = (await (await fetch(listUrl)).json()) as { data?: Array<{ id?: string }> };
+    let cents = 0;
+    let hits = 0;
+    for (const video of list.data || []) {
+      if (!video.id) continue;
+      const insightUrl = new URL(`https://graph.facebook.com/${GRAPH}/${video.id}/video_insights`);
+      insightUrl.searchParams.set("metric", "total_video_ad_break_earnings");
+      insightUrl.searchParams.set("period", "lifetime");
+      insightUrl.searchParams.set("access_token", token);
+      const insight = (await (await fetch(insightUrl)).json()) as {
+        data?: Array<{ values?: Array<{ value?: number }> }>;
+      };
+      const value = insight.data?.[0]?.values?.[0]?.value;
+      if (typeof value === "number") {
+        cents += value;
+        hits += 1;
+      }
+    }
+    if (hits) {
+      return {
+        amount: cents / 100,
+        note: `Facebook ad-break estimate from ${hits} recent videos (lifetime, USD).`,
+      };
+    }
+  } catch {
+    /* optional */
+  }
+  return {
+    amount: null,
+    note: "No Facebook ad-break earnings in this period (monetization may be off).",
+  };
+}
+
+async function metaLive(
+  request: Request,
+  from: string,
+  to: string,
+): Promise<{ facebook: ChannelMetrics; instagram: ChannelMetrics; facebookMoneyNote: string; instagramMoneyNote: string }> {
   const href = "/api/meta/start";
   if (!metaConfigured()) {
     const missing = empty(
@@ -236,11 +316,21 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
       href,
       "Facebook is not configured yet. Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in Cursor Secrets.",
     );
-    return { facebook: missing, instagram: { ...missing } };
+    return {
+      facebook: missing,
+      instagram: { ...missing },
+      facebookMoneyNote: "Connect Facebook to load Page earnings.",
+      instagramMoneyNote: "Connect Instagram via Facebook first.",
+    };
   }
   const session = readMeta(request);
   if (!session) {
-    return { facebook: empty(true, href), instagram: empty(true, href) };
+    return {
+      facebook: empty(true, href),
+      instagram: empty(true, href),
+      facebookMoneyNote: "Connect Facebook to load Page earnings.",
+      instagramMoneyNote: "Connect Instagram via Facebook first.",
+    };
   }
 
   let facebook: ChannelMetrics = {
@@ -253,6 +343,7 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
     revenue: null,
     href,
   };
+  let facebookMoneyNote = "Facebook earnings unavailable.";
   try {
     const pageUrl = new URL(`https://graph.facebook.com/${GRAPH}/${session.pageId}`);
     pageUrl.searchParams.set("fields", "name,fan_count,followers_count");
@@ -263,7 +354,15 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
       followers_count?: number;
       error?: { message?: string };
     };
-    const impressions = await insightSum(`/${session.pageId}/insights`, session.pageToken, "page_impressions");
+    const impressions = await insightSum(
+      `/${session.pageId}/insights`,
+      session.pageToken,
+      "page_impressions",
+      from,
+      to,
+    );
+    const money = await facebookEarnings(session.pageId, session.pageToken, from, to);
+    facebookMoneyNote = money.note;
     facebook = {
       connected: true,
       configured: true,
@@ -271,12 +370,14 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
       views: impressions,
       followers: page.followers_count ?? page.fan_count ?? null,
       posts: null,
-      revenue: null,
+      revenue: money.amount,
+      currency: "CHF",
       href,
       error: page.error?.message,
     };
   } catch (error) {
     facebook.error = error instanceof Error ? error.message : "Facebook stats unavailable";
+    facebookMoneyNote = facebook.error;
   }
 
   if (!session.igId) {
@@ -287,6 +388,8 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
         href,
         "Link a professional Instagram account to your Facebook Page, then connect again.",
       ),
+      facebookMoneyNote,
+      instagramMoneyNote: "Link a professional Instagram account to your Facebook Page.",
     };
   }
 
@@ -300,6 +403,8 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
     revenue: null,
     href,
   };
+  let instagramMoneyNote =
+    "Instagram Reels bonuses / gifts are not exposed on this Graph login yet.";
   try {
     const igUrl = new URL(`https://graph.facebook.com/${GRAPH}/${session.igId}`);
     igUrl.searchParams.set("fields", "username,followers_count,media_count");
@@ -310,7 +415,7 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
       media_count?: number;
       error?: { message?: string };
     };
-    const reach = await insightSum(`/${session.igId}/insights`, session.pageToken, "reach");
+    const reach = await insightSum(`/${session.igId}/insights`, session.pageToken, "reach", from, to);
     instagram = {
       connected: true,
       configured: true,
@@ -324,9 +429,10 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
     };
   } catch (error) {
     instagram.error = error instanceof Error ? error.message : "Instagram stats unavailable";
+    instagramMoneyNote = instagram.error;
   }
 
-  return { facebook, instagram };
+  return { facebook, instagram, facebookMoneyNote, instagramMoneyNote };
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -334,7 +440,7 @@ export async function GET(request: Request): Promise<Response> {
   const [youtube, tiktok, meta] = await Promise.all([
     youtubeLive(request, period.from, period.to),
     tiktokLive(request),
-    metaLive(request),
+    metaLive(request, period.from, period.to),
   ]);
   const channels = {
     youtube: youtube.channel,
@@ -354,32 +460,29 @@ export async function GET(request: Request): Promise<Response> {
     {
       network: "tiktok",
       label: channels.tiktok.name || "TikTok",
-      amount: null,
+      amount: channels.tiktok.revenue,
       currency: "CHF",
       note: channels.tiktok.connected
-        ? "TikTok does not expose creator payouts to this app yet."
+        ? "TikTok Creator Rewards are not available through the public posting API yet."
         : "Connect TikTok first.",
     },
     {
       network: "instagram",
       label: channels.instagram.name || "Instagram",
-      amount: null,
+      amount: channels.instagram.revenue,
       currency: "CHF",
-      note: channels.instagram.connected
-        ? "Instagram payouts are not available through Page login yet."
-        : "Connect Instagram via Facebook first.",
+      note: meta.instagramMoneyNote,
     },
     {
       network: "facebook",
       label: channels.facebook.name || "Facebook",
-      amount: null,
+      amount: channels.facebook.revenue,
       currency: "CHF",
-      note: channels.facebook.connected
-        ? "Facebook Page ad earnings need a linked Meta Ads account (not wired yet)."
-        : "Connect Facebook first.",
+      note: meta.facebookMoneyNote,
     },
   ];
   const known = rows.map((row) => row.amount).filter((value): value is number => typeof value === "number");
+  const reporting = rows.filter((row) => channels[row.network].connected).length;
   const snapshot: Snapshot = {
     source: connectedCount ? "live" : "setup",
     checkedAt: new Date().toISOString(),
@@ -391,8 +494,8 @@ export async function GET(request: Request): Promise<Response> {
       rows,
       note:
         known.length > 0
-          ? `${period.label} · totals include networks that share revenue with this desk.`
-          : `${period.label} · Connect YouTube (monetized) to see money made. TikTok/Facebook/Instagram payouts are listed when available.`,
+          ? `${period.label} · Money made from all connected accounts that report earnings (${known.length} of ${Math.max(reporting, 1)}).`
+          : `${period.label} · Connect YouTube + Facebook (monetized) to fill Money made from all accounts. TikTok/Instagram payouts appear when those APIs allow it.`,
     },
     channels,
   };

@@ -67,14 +67,14 @@ export function ControlRoom({ onOpenStudio }: Props) {
         </section>
 
         <section className="panel intro money" aria-labelledby="money-title">
-          <div className="eyebrow">Earnings</div>
+          <div className="eyebrow">All accounts</div>
           <h2 id="money-title">Money made</h2>
           <p className="money-total" id="money-total">
             —
           </p>
           <p className="setup-note" id="money-note">
-            Connect a monetized YouTube channel to load estimated ad revenue. Facebook, Instagram, and TikTok
-            payouts appear here when those networks allow it.
+            Total from YouTube, TikTok, Instagram, and Facebook. Connect each account to fill its row. YouTube
+            uses estimated ad revenue; Facebook uses Page ad-break earnings when monetization is on.
           </p>
           <div className="money-rows" id="money-breakdown" />
         </section>
