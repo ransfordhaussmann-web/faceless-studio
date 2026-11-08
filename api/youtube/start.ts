@@ -15,7 +15,15 @@ export async function GET(request: Request): Promise<Response> {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
-  url.searchParams.set("scope", "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly");
+  url.searchParams.set(
+    "scope",
+    [
+      "https://www.googleapis.com/auth/youtube.upload",
+      "https://www.googleapis.com/auth/youtube.readonly",
+      "https://www.googleapis.com/auth/yt-analytics.readonly",
+      "https://www.googleapis.com/auth/yt-analytics-monetary.readonly",
+    ].join(" "),
+  );
   url.searchParams.set("state", state);
   return new Response(null, {
     status: 302,

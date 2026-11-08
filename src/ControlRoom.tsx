@@ -61,9 +61,22 @@ export function ControlRoom({ onOpenStudio }: Props) {
           <div className="eyebrow">Live analytics setup</div>
           <h2 id="setup-title">Your social channels</h2>
           <p className="setup-note" id="metrics-status" role="status">
-            Loading the last verified Metricool snapshot…
+            Loading your connected accounts…
           </p>
           <p className="setup-note" id="metrics-range" hidden />
+        </section>
+
+        <section className="panel intro money" aria-labelledby="money-title">
+          <div className="eyebrow">Earnings</div>
+          <h2 id="money-title">Money made</h2>
+          <p className="money-total" id="money-total">
+            —
+          </p>
+          <p className="setup-note" id="money-note">
+            Connect a monetized YouTube channel to load estimated ad revenue. Facebook, Instagram, and TikTok
+            payouts appear here when those networks allow it.
+          </p>
+          <div className="money-rows" id="money-breakdown" />
         </section>
 
         <section className="panel intro production" lang="de-CH" aria-labelledby="production-title">
@@ -155,8 +168,8 @@ export function ControlRoom({ onOpenStudio }: Props) {
               <dd id="youtube-views">—</dd>
               <dt>Subscribers</dt>
               <dd id="youtube-followers">—</dd>
-              <dt>Videos published</dt>
-              <dd id="youtube-posts">—</dd>
+              <dt>Money made</dt>
+              <dd id="youtube-revenue">—</dd>
             </dl>
             <a id="youtube-link" href="/api/youtube/start">
               Connect YouTube ↗
@@ -176,8 +189,8 @@ export function ControlRoom({ onOpenStudio }: Props) {
               <dd id="tiktok-views">—</dd>
               <dt>Followers</dt>
               <dd id="tiktok-followers">—</dd>
-              <dt>Videos published</dt>
-              <dd id="tiktok-posts">—</dd>
+              <dt>Money made</dt>
+              <dd id="tiktok-revenue">—</dd>
             </dl>
             <a id="tiktok-link" href="/api/tiktok/start">
               Connect TikTok ↗
@@ -193,12 +206,12 @@ export function ControlRoom({ onOpenStudio }: Props) {
               Awaiting data
             </span>
             <dl>
-              <dt>Views</dt>
+              <dt>Reach</dt>
               <dd id="instagram-views">—</dd>
               <dt>Followers</dt>
               <dd id="instagram-followers">—</dd>
-              <dt>Feed posts + Reels</dt>
-              <dd id="instagram-posts">—</dd>
+              <dt>Money made</dt>
+              <dd id="instagram-revenue">—</dd>
             </dl>
             <a id="instagram-link" href="/api/meta/start">
               Connect Instagram Reels ↗
@@ -214,12 +227,12 @@ export function ControlRoom({ onOpenStudio }: Props) {
               Awaiting data
             </span>
             <dl>
-              <dt>Page views</dt>
+              <dt>Impressions</dt>
               <dd id="facebook-views">—</dd>
               <dt>Followers</dt>
               <dd id="facebook-followers">—</dd>
-              <dt>Feed posts + Reels</dt>
-              <dd id="facebook-posts">—</dd>
+              <dt>Money made</dt>
+              <dd id="facebook-revenue">—</dd>
             </dl>
             <a id="facebook-link" href="/api/meta/start">
               Connect Facebook ↗

@@ -10,14 +10,31 @@ type ChannelMetrics = {
   views: number | null;
   followers: number | null;
   posts: number | null;
+  revenue: number | null;
+  currency?: string;
   error?: string;
   href?: string;
+};
+
+type MoneyRow = {
+  network: "youtube" | "tiktok" | "instagram" | "facebook";
+  label: string;
+  amount: number | null;
+  currency: string;
+  note: string;
 };
 
 type Snapshot = {
   source: "live" | "setup";
   checkedAt: string;
   connectedCount: number;
+  period: { from: string; to: string; label: string };
+  money: {
+    total: number | null;
+    currency: string;
+    rows: MoneyRow[];
+    note: string;
+  };
   channels: {
     youtube: ChannelMetrics;
     tiktok: ChannelMetrics;
@@ -27,10 +44,68 @@ type Snapshot = {
 };
 
 function empty(configured: boolean, href: string, error?: string): ChannelMetrics {
-  return { connected: false, configured, views: null, followers: null, posts: null, href, error };
+  return {
+    connected: false,
+    configured,
+    views: null,
+    followers: null,
+    posts: null,
+    revenue: null,
+    href,
+    error,
+  };
 }
 
-async function youtubeLive(request: Request): Promise<{ channel: ChannelMetrics; cookie?: string }> {
+function periodRange() {
+  const to = new Date();
+  const from = new Date();
+  from.setUTCDate(from.getUTCDate() - 28);
+  const stamp = (value: Date) => value.toISOString().slice(0, 10);
+  return {
+    from: stamp(from),
+    to: stamp(to),
+    label: "Last 28 days",
+  };
+}
+
+async function youtubeRevenue(access: string, from: string, to: string): Promise<{ amount: number | null; note: string }> {
+  try {
+    const url = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
+    url.searchParams.set("ids", "channel==MINE");
+    url.searchParams.set("startDate", from);
+    url.searchParams.set("endDate", to);
+    url.searchParams.set("metrics", "estimatedRevenue");
+    const response = await fetch(url, { headers: { authorization: `Bearer ${access}` } });
+    const data = (await response.json()) as {
+      rows?: number[][];
+      error?: { message?: string };
+    };
+    if (data.error?.message) {
+      return {
+        amount: null,
+        note: /insufficient|scope|permission|forbidden/i.test(data.error.message)
+          ? "Reconnect YouTube and allow revenue access, or monetization is off."
+          : data.error.message,
+      };
+    }
+    const amount = data.rows?.[0]?.[0];
+    if (typeof amount !== "number") {
+      return { amount: null, note: "No YouTube revenue in this period yet." };
+    }
+    return { amount, note: "YouTube estimated revenue (ads)." };
+  } catch (error) {
+    return {
+      amount: null,
+      note: error instanceof Error ? error.message : "YouTube revenue unavailable",
+    };
+  }
+}
+
+async function youtubeLive(
+  request: Request,
+  from: string,
+  to: string,
+): Promise<{ channel: ChannelMetrics; cookie?: string; moneyNote: string }> {
   const href = "/api/youtube/start";
   if (!youtubeConfigured()) {
     return {
@@ -39,10 +114,11 @@ async function youtubeLive(request: Request): Promise<{ channel: ChannelMetrics;
         href,
         "YouTube is not configured yet. Add YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in Cursor Secrets.",
       ),
+      moneyNote: "Connect YouTube to load ad revenue.",
     };
   }
   const session = readYouTube(request);
-  if (!session) return { channel: empty(true, href) };
+  if (!session) return { channel: empty(true, href), moneyNote: "Connect YouTube to load ad revenue." };
   try {
     const fresh = await refreshYouTube(request, session);
     const response = await fetch(
@@ -57,6 +133,7 @@ async function youtubeLive(request: Request): Promise<{ channel: ChannelMetrics;
     };
     const item = data.items?.[0];
     const name = item?.snippet?.title || fresh.name || "YouTube";
+    const money = await youtubeRevenue(fresh.access, from, to);
     return {
       channel: {
         connected: true,
@@ -65,13 +142,17 @@ async function youtubeLive(request: Request): Promise<{ channel: ChannelMetrics;
         views: Number(item?.statistics?.viewCount ?? 0),
         followers: Number(item?.statistics?.subscriberCount ?? 0),
         posts: Number(item?.statistics?.videoCount ?? 0),
+        revenue: money.amount,
+        currency: "CHF",
         href,
       },
       cookie: youtubeCookie({ ...fresh, name }, request),
+      moneyNote: money.note,
     };
   } catch (error) {
     return {
       channel: empty(true, href, error instanceof Error ? error.message : "YouTube session expired"),
+      moneyNote: "YouTube revenue unavailable.",
     };
   }
 }
@@ -117,6 +198,7 @@ async function tiktokLive(request: Request): Promise<{ channel: ChannelMetrics; 
         views: user?.likes_count ?? null,
         followers: user?.follower_count ?? null,
         posts: user?.video_count ?? null,
+        revenue: null,
         href,
         error: data.error?.message,
       },
@@ -127,6 +209,23 @@ async function tiktokLive(request: Request): Promise<{ channel: ChannelMetrics; 
       channel: empty(true, href, error instanceof Error ? error.message : "TikTok session expired"),
     };
   }
+}
+
+async function insightSum(
+  path: string,
+  token: string,
+  metric: string,
+): Promise<number | null> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH}${path}`);
+  url.searchParams.set("metric", metric);
+  url.searchParams.set("period", "day");
+  url.searchParams.set("access_token", token);
+  const data = (await (await fetch(url)).json()) as {
+    data?: Array<{ values?: Array<{ value?: number }> }>;
+  };
+  const values = data.data?.[0]?.values || [];
+  if (!values.length) return null;
+  return values.reduce((sum, item) => sum + Number(item.value || 0), 0);
 }
 
 async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; instagram: ChannelMetrics }> {
@@ -151,6 +250,7 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
     views: null,
     followers: null,
     posts: null,
+    revenue: null,
     href,
   };
   try {
@@ -163,13 +263,15 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
       followers_count?: number;
       error?: { message?: string };
     };
+    const impressions = await insightSum(`/${session.pageId}/insights`, session.pageToken, "page_impressions");
     facebook = {
       connected: true,
       configured: true,
       name: page.name || session.pageName,
-      views: null,
+      views: impressions,
       followers: page.followers_count ?? page.fan_count ?? null,
       posts: null,
+      revenue: null,
       href,
       error: page.error?.message,
     };
@@ -195,6 +297,7 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
     views: null,
     followers: null,
     posts: null,
+    revenue: null,
     href,
   };
   try {
@@ -207,13 +310,15 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
       media_count?: number;
       error?: { message?: string };
     };
+    const reach = await insightSum(`/${session.igId}/insights`, session.pageToken, "reach");
     instagram = {
       connected: true,
       configured: true,
       name: ig.username || session.igName || "Instagram",
-      views: null,
+      views: reach,
       followers: ig.followers_count ?? null,
       posts: ig.media_count ?? null,
+      revenue: null,
       href,
       error: ig.error?.message,
     };
@@ -225,7 +330,12 @@ async function metaLive(request: Request): Promise<{ facebook: ChannelMetrics; i
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const [youtube, tiktok, meta] = await Promise.all([youtubeLive(request), tiktokLive(request), metaLive(request)]);
+  const period = periodRange();
+  const [youtube, tiktok, meta] = await Promise.all([
+    youtubeLive(request, period.from, period.to),
+    tiktokLive(request),
+    metaLive(request),
+  ]);
   const channels = {
     youtube: youtube.channel,
     tiktok: tiktok.channel,
@@ -233,10 +343,57 @@ export async function GET(request: Request): Promise<Response> {
     facebook: meta.facebook,
   };
   const connectedCount = Object.values(channels).filter((item) => item.connected).length;
+  const rows: MoneyRow[] = [
+    {
+      network: "youtube",
+      label: channels.youtube.name || "YouTube",
+      amount: channels.youtube.revenue,
+      currency: "CHF",
+      note: youtube.moneyNote,
+    },
+    {
+      network: "tiktok",
+      label: channels.tiktok.name || "TikTok",
+      amount: null,
+      currency: "CHF",
+      note: channels.tiktok.connected
+        ? "TikTok does not expose creator payouts to this app yet."
+        : "Connect TikTok first.",
+    },
+    {
+      network: "instagram",
+      label: channels.instagram.name || "Instagram",
+      amount: null,
+      currency: "CHF",
+      note: channels.instagram.connected
+        ? "Instagram payouts are not available through Page login yet."
+        : "Connect Instagram via Facebook first.",
+    },
+    {
+      network: "facebook",
+      label: channels.facebook.name || "Facebook",
+      amount: null,
+      currency: "CHF",
+      note: channels.facebook.connected
+        ? "Facebook Page ad earnings need a linked Meta Ads account (not wired yet)."
+        : "Connect Facebook first.",
+    },
+  ];
+  const known = rows.map((row) => row.amount).filter((value): value is number => typeof value === "number");
   const snapshot: Snapshot = {
     source: connectedCount ? "live" : "setup",
     checkedAt: new Date().toISOString(),
     connectedCount,
+    period,
+    money: {
+      total: known.length ? known.reduce((sum, value) => sum + value, 0) : null,
+      currency: "CHF",
+      rows,
+      note:
+        known.length > 0
+          ? `${period.label} · totals include networks that share revenue with this desk.`
+          : `${period.label} · Connect YouTube (monetized) to see money made. TikTok/Facebook/Instagram payouts are listed when available.`,
+    },
     channels,
   };
 

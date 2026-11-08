@@ -12,7 +12,7 @@ export function bootControlRoom() {
    {name:'Clipper',role:'Best moments',icon:'▷',color:'#ff7a91',shirt:'#ed4c62',hair:'#211625',skin:'#b76b4b',task:'Cutting clips',screen:'video',detail:'Selects short segments and lays out rough cuts.'},
    {name:'Editor',role:'Captions',icon:'✂',color:'#ffe071',shirt:'#eeb830',hair:'#f4ca55',skin:'#ed9f67',task:'Checking pacing',screen:'edit',detail:'Checks pacing and captions before a cut goes to review.'}
   ];
-  const platforms=[['YouTube','▷',51,'#ff617d','82.4K'],['Shorts','▯',54,'#ff9958','45.9K'],['TikTok','♪',55,'#56e6ec','112.5K'],['Reels','◎',53,'#ff67c6','76.9K']];
+  const platforms=[['YouTube','▷',51,'#ff617d','82.4K'],['TikTok','♪',55,'#56e6ec','112.5K'],['Instagram','◎',53,'#ff67c6','76.9K'],['Facebook','f',48,'#82a3ff','41.2K']];
   const defaults={
    queue:[
    {id:'q1',title:'Approve this week’s hooks',platform:'Shorts',notes:'Review the opening lines for the Friday short-form batch.'},
@@ -20,12 +20,12 @@ export function bootControlRoom() {
    {id:'q3',title:'Approve the Friday clips',platform:'TikTok',notes:'Three clips are ready for the Friday posting window.'}
    ],
    approved:[],
-   activity:[
-   ['#ff67c6','A Reel was saved 340 times','Just now'],
-   ['#58e8ff','Analyst flagged a stronger opening hook','4m ago'],
-   ['#ffab60','Community sorted 18 new comments','8m ago'],
-   ['#bc9aff','Writer finished the first script draft','12m ago']
-   ],
+  activity:[
+   ['#82a3ff','Facebook Page picked up 1.2K impressions','Just now'],
+   ['#ff67c6','An Instagram Reel was saved 340 times','4m ago'],
+   ['#58e8ff','Analyst flagged a stronger opening hook','8m ago'],
+   ['#ffe071','Money made this month updated from YouTube','12m ago']
+  ],
    paused:false
   };
   const key='content-control-room-v1';
@@ -54,7 +54,12 @@ export function bootControlRoom() {
    return '<svg class="desk" viewBox="0 0 144 78" aria-hidden="true"><defs><linearGradient id="desk'+index+'" x2="0" y2="1"><stop stop-color="#5a4f8d"/><stop offset="1" stop-color="#2d2855"/></linearGradient></defs><ellipse cx="73" cy="69" rx="65" ry="6" fill="'+color+'" opacity=".12"/><rect x="62" y="9" width="52" height="37" rx="4" fill="#0f1428" stroke="'+color+'" stroke-opacity=".8"/><rect x="66" y="13" width="44" height="29" rx="2" fill="'+color+'" opacity=".11"/><g class="scan" style="color:'+color+'" transform="translate(66 12)">'+screens[screen]+'</g><path d="M87 46v8m-11 0h22" stroke="#7469a8" stroke-width="3"/><g class="worker"><g shape-rendering="crispEdges"><path fill="'+hair+'" d="M12 21h4v-4h15v3h5v5h3v12H10V25h2z"/><path fill="'+skin+'" d="M15 24h20v5h3v6h-4v6H17v-4h-4V29h2z"/><path fill="#32253a" d="M19 29h2v3h-2zm11 0h2v3h-2z"/><path fill="#fff0c7" d="M24 35h4v2h-4z"/>'+glasses+headwear+'<path fill="'+shirt+'" d="M16 40h18v3h6v6h4v7H8v-7h4v-6h4z"/><path fill="'+skin+'" d="M11 51h7v5h-7zm23 0h7v5h-7z"/><path fill="#fff" opacity=".65" d="M23 45h2v7h-2zm5 0h2v7h-2z"/></g></g><rect x="119" y="48" width="9" height="9" rx="2" fill="'+color+'" opacity=".65"/><path d="M128 50h3v4h-3" fill="none" stroke="'+color+'"/><rect x="4" y="56" width="136" height="8" rx="3" fill="url(#desk'+index+')"/><path d="M13 64h118l-4 9H17z" fill="#2a254b"/><path d="M21 68h42m14 0h45" stroke="'+color+'" stroke-width="1.5" opacity=".75"/></svg>';
   }
   function render(){
-   const metrics=[['Views today','190K','▲ 12.4%','#ae8aff'],['Watch time (h)','6,139','▲ 8.1%','#53dcff'],['New followers','+547','▲ 21%','#60f5ab'],['Posts published','57','Across 4 channels','#ffe071']];
+   const liveMoney=window.__ccrMoney;
+   const moneyValue=liveMoney&&typeof liveMoney.total==='number'
+     ? new Intl.NumberFormat('de-CH',{style:'currency',currency:liveMoney.currency||'CHF',maximumFractionDigits:0}).format(liveMoney.total)
+     : 'CHF 1’240';
+   const moneyDelta=liveMoney&&typeof liveMoney.total==='number'?'Live · last 28 days':'Demo · last 28 days';
+   const metrics=[['Views today','190K','▲ 12.4%','#ae8aff'],['Money made',moneyValue,moneyDelta,'#ffe071'],['New followers','+547','▲ 21%','#60f5ab'],['Posts published','57','YouTube · TikTok · IG · Facebook','#53dcff']];
    $('metrics').innerHTML=metrics.map(([label,value,delta,color],i)=>'<section class="panel metric" style="--accent:'+color+'"><div class="eyebrow">'+label+'</div><strong>'+value+'</strong><em>'+delta+'</em><svg viewBox="0 0 60 22" preserveAspectRatio="none" aria-hidden="true"><path d="M1 20 '+['11 18 19 19 27 13 36 14 45 7 51 8 59 2','10 18 17 15 25 16 33 11 41 12 50 6 59 3','10 16 18 17 26 12 35 13 43 8 51 8 59 2','10 19 18 13 27 15 34 9 42 10 51 4 59 2'][i]+'" fill="none" stroke="'+color+'" stroke-width="2"/></svg></section>').join('');
    $('roster').innerHTML=agents.map(a=>'<div class="status" style="--accent:'+a.color+'"><span class="badge-icon" aria-hidden="true">'+a.icon+'</span><div style="min-width:0"><b>'+a.name+'</b><small>'+a.role+' · '+a.task+'</small></div><i class="dot" aria-hidden="true"></i></div>').join('');
    $('platforms').innerHTML=platforms.map(([name,icon,count,color])=>'<div class="platform" style="--accent:'+color+'"><span>'+icon+' '+name+'</span><strong>'+count+' posts</strong></div>').join('');
@@ -153,8 +158,10 @@ export function bootControlRoom() {
     const dateOptions={timeZone:'Europe/Zurich',dateStyle:'medium',timeStyle:'short'};
     const checked=new Date(snapshot.checkedAt).toLocaleString('en-CH',dateOptions);
     const count=new Intl.NumberFormat('en-CH');
+    const money=new Intl.NumberFormat('de-CH',{style:'currency',currency:(snapshot.money&&snapshot.money.currency)||'CHF'});
     const labels={youtube:'YouTube',tiktok:'TikTok',instagram:'Instagram',facebook:'Facebook'};
     let connected=0;
+    window.__ccrMoney=snapshot.money||null;
     for(const [network, metrics] of Object.entries(snapshot.channels)){
      const statusEl=$(network+'-status');
      const link=$(network+'-link');
@@ -175,16 +182,31 @@ export function bootControlRoom() {
        link.href=metrics.href || ('/api/'+(network==='instagram'||network==='facebook'?'meta':network)+'/start');
       }
      }
-     $(''+network+'-views').textContent=metrics.views===null||metrics.views===undefined?'—':count.format(metrics.views);
-     $(''+network+'-followers').textContent=metrics.followers===null||metrics.followers===undefined?'—':count.format(metrics.followers);
-     $(''+network+'-posts').textContent=metrics.posts===null||metrics.posts===undefined?'—':count.format(metrics.posts);
+     const viewsEl=$(network+'-views');
+     const followersEl=$(network+'-followers');
+     const postsEl=$(network+'-posts');
+     const revenueEl=$(network+'-revenue');
+     if(viewsEl) viewsEl.textContent=metrics.views===null||metrics.views===undefined?'—':count.format(metrics.views);
+     if(followersEl) followersEl.textContent=metrics.followers===null||metrics.followers===undefined?'—':count.format(metrics.followers);
+     if(postsEl) postsEl.textContent=metrics.posts===null||metrics.posts===undefined?'—':count.format(metrics.posts);
+     if(revenueEl) revenueEl.textContent=typeof metrics.revenue==='number'?money.format(metrics.revenue):'—';
+    }
+    const moneyTotal=$('money-total');
+    const moneyNote=$('money-note');
+    const moneyBreakdown=$('money-breakdown');
+    if(moneyTotal&&snapshot.money){
+     moneyTotal.textContent=typeof snapshot.money.total==='number'?money.format(snapshot.money.total):'—';
+     if(moneyNote) moneyNote.textContent=snapshot.money.note||'';
+     if(moneyBreakdown){
+      moneyBreakdown.innerHTML=(snapshot.money.rows||[]).map(row=>'<div class="money-row"><div><b>'+clean(row.label)+'</b></div><strong>'+(typeof row.amount==='number'?money.format(row.amount):'—')+'</strong><small>'+clean(row.note||'')+'</small></div>').join('');
+     }
     }
     if(liveBadge) liveBadge.hidden=connected===0;
     if(connected){
      status.textContent=connected+' of 4 accounts live · Last refresh '+checked+' (Zurich)';
-     range.textContent='Stats come from your TikTok, YouTube, Instagram, and Facebook logins — not demo data.';
+     range.textContent='Includes Facebook · Stats and money come from your logins — not demo data.';
      range.hidden=false;
-     if(access) access.textContent='Your connected accounts are live on this desk. Open demo is still a practice floor. Open Shorts desk to build and auto-post 9:16 videos to these accounts.';
+     if(access) access.textContent='Your connected accounts are live on this desk, including Facebook. Open demo is still a practice floor. Open Shorts desk to build and auto-post 9:16 videos to these accounts.';
     }else{
      status.textContent='No live accounts yet. Connect TikTok, Instagram, Facebook, and YouTube below.';
      range.textContent='Use the Cursor-hosted app with secrets filled in. GitHub Pages cannot log you in.';
@@ -199,6 +221,7 @@ export function bootControlRoom() {
     }
     if(params.get('live')==='1' && connected) toast(connected+' live account'+(connected===1?'':'s')+' on this desk.');
     if(params.toString()) window.history.replaceState({}, '', window.location.pathname || './');
+    render();
    }catch{status.textContent='Could not load live account stats. Reload the page to try again.';}
   }
   loadMetrics();
