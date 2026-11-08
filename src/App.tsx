@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Player } from "./Player";
 import { downloadFile, hasFile, hydrateFiles, shareFile } from "./files";
+import { disconnectAccount, publishReady, tiktokStatus, youtubeStatus, type AccountStatus } from "./post";
 import { exportShort } from "./produce";
 import {
   ART_STYLES,
@@ -36,6 +37,15 @@ export function App() {
   const [buildNote, setBuildNote] = useState("");
   const [activeId, setActiveId] = useState<string | null>(initial.shorts[0]?.id ?? null);
   const [filesTick, setFilesTick] = useState(0);
+  const [accounts, setAccounts] = useState<{ tiktok: AccountStatus; youtube: AccountStatus }>({
+    tiktok: { configured: false, connected: false },
+    youtube: { configured: false, connected: false },
+  });
+  const posting = useRef(new Set<string>());
+  const shortsRef = useRef(shorts);
+  const accountsRef = useRef(accounts);
+  shortsRef.current = shorts;
+  accountsRef.current = accounts;
 
   useEffect(() => {
     saveState({ channel, shorts });
@@ -44,6 +54,31 @@ export function App() {
   useEffect(() => {
     void hydrateFiles(initial.shorts.map((item) => item.id)).then(() => setFilesTick((value) => value + 1));
   }, [initial.shorts]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextView = params.get("view");
+    if (nextView === "create" || nextView === "library" || nextView === "queue" || nextView === "channel") {
+      setView(nextView);
+    }
+    const tiktok = params.get("tiktok");
+    const youtube = params.get("youtube");
+    if (tiktok === "connected") setBuildNote("TikTok connected. New Shorts will post automatically.");
+    if (tiktok === "denied") setBuildNote("TikTok login was cancelled.");
+    if (tiktok === "missing") setBuildNote("Add TikTok keys in Cursor Secrets, then connect again.");
+    if (youtube === "connected") setBuildNote("YouTube connected. New Shorts will post automatically.");
+    if (youtube === "denied") setBuildNote("YouTube login was cancelled.");
+    if (youtube === "missing") setBuildNote("Add YouTube keys in Cursor Secrets, then connect again.");
+    if (params.toString()) window.history.replaceState({}, "", window.location.pathname || "./");
+    void refreshAccounts();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => void flushDue(), 20_000);
+    void flushDue();
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const active = shorts.find((item) => item.id === activeId) ?? shorts[0] ?? null;
   const queued = shorts.filter((item) => item.status === "queued").sort((a, b) => (a.queuedAt ?? 0) - (b.queuedAt ?? 0));
@@ -68,15 +103,25 @@ export function App() {
       setPipeline(3);
       next = await exportShort(next, channel, setBuildNote);
       setPipeline(4);
+      let live = accounts;
       if (channel.auto) {
         next = { ...next, status: "queued", queuedAt: laterTonight() };
+        live = await refreshAccounts();
+        if (live.tiktok.connected || live.youtube.connected) {
+          setBuildNote("Posting…");
+          next = await applyPost(next, live);
+        }
       }
       setPipeline(5);
       setShorts((list) => [next, ...list]);
       setActiveId(next.id);
       setIdea("");
       setFilesTick((value) => value + 1);
-      setBuildNote(channel.auto ? "Queued tonight · video ready to share" : "Video ready to share");
+      if (!next.postNote) {
+        setBuildNote(channel.auto ? liveNote(live) : "Video ready to share");
+      } else {
+        setBuildNote(next.postNote);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Export failed";
       setBuildNote(
@@ -101,12 +146,19 @@ export function App() {
     setBuildNote("Exporting…");
     setPipeline(3);
     try {
-      const next = await exportShort(short, channel, setBuildNote);
-      const queued = channel.auto ? { ...next, status: "queued" as const, queuedAt: next.queuedAt ?? laterTonight() } : next;
-      updateShort(id, queued);
+      let next = await exportShort(short, channel, setBuildNote);
+      if (channel.auto) {
+        next = { ...next, status: "queued", queuedAt: next.queuedAt ?? laterTonight() };
+        const live = await refreshAccounts();
+        if (live.tiktok.connected || live.youtube.connected) {
+          setBuildNote("Posting…");
+          next = await applyPost(next, live);
+        }
+      }
+      updateShort(id, next);
       setFilesTick((value) => value + 1);
       setPipeline(5);
-      setBuildNote("Video ready to share");
+      setBuildNote(next.postNote || (channel.auto ? liveNote(accounts) : "Video ready to share"));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Export failed";
       setBuildNote(
@@ -127,6 +179,67 @@ export function App() {
     if (result === "shared") setBuildNote("Shared. Mark posted when TikTok has it.");
   }
 
+  async function refreshAccounts() {
+    const [tiktok, youtube] = await Promise.all([tiktokStatus(), youtubeStatus()]);
+    const next = { tiktok, youtube };
+    setAccounts(next);
+    return next;
+  }
+
+  async function applyPost(short: Short, live = accounts): Promise<Short> {
+    const results = await publishReady(short, live);
+    if (!results.length) {
+      return {
+        ...short,
+        postNote: "Connect TikTok or YouTube in Channel to auto-post.",
+      };
+    }
+    const ok = results.filter((item) => item.ok);
+    const note = results.map((item) => item.message).join(" · ");
+    if (ok.length) {
+      return {
+        ...short,
+        status: "posted",
+        queuedAt: short.queuedAt,
+        postedTo: ok.map((item) => item.target),
+        postNote: note,
+      };
+    }
+    return { ...short, postNote: note };
+  }
+
+  function liveNote(live: { tiktok: AccountStatus; youtube: AccountStatus }): string {
+    if (live.tiktok.connected || live.youtube.connected) {
+      return "Queued · will post to the connected account.";
+    }
+    if (live.tiktok.error === "static" || live.youtube.error === "static") {
+      return "Queued. Auto-post needs the Cursor-hosted app with TikTok secrets — this copy can still share the file.";
+    }
+    if (!live.tiktok.configured && !live.youtube.configured) {
+      return "Queued. Connect TikTok in Channel after adding keys in Cursor Secrets.";
+    }
+    return "Queued tonight. Connect TikTok in Channel to post automatically.";
+  }
+
+  async function postNow(id: string) {
+    const short = shorts.find((item) => item.id === id);
+    if (!short || busy) return;
+    if (!hasFile(id)) await exportActive(id);
+    const current = shorts.find((item) => item.id === id);
+    const target = current ?? short;
+    if (!hasFile(target.id)) return;
+    setBusy(true);
+    setBuildNote("Posting…");
+    try {
+      const live = await refreshAccounts();
+      const next = await applyPost(target, live);
+      updateShort(id, next);
+      setBuildNote(next.postNote || "Posted.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function updateShort(id: string, patch: Partial<Short>) {
     setShorts((list) => list.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   }
@@ -134,6 +247,31 @@ export function App() {
   function queueShort(id: string, when: number | null, status: Short["status"]) {
     updateShort(id, { queuedAt: when, status });
     setView("queue");
+  }
+
+  async function flushDue() {
+    const list = shortsRef.current;
+    const live = accountsRef.current;
+    const due = list.filter(
+      (item) =>
+        item.status === "queued" &&
+        (item.queuedAt ?? 0) <= Date.now() &&
+        hasFile(item.id) &&
+        !item.postedTo?.length &&
+        !item.postNote,
+    );
+    if (!due.length) return;
+    if (!live.tiktok.connected && !live.youtube.connected) return;
+    for (const short of due) {
+      if (posting.current.has(short.id)) continue;
+      posting.current.add(short.id);
+      try {
+        const next = await applyPost(short, live);
+        if (next.status === "posted" || next.postNote) updateShort(short.id, next);
+      } finally {
+        posting.current.delete(short.id);
+      }
+    }
   }
 
   return (
@@ -184,6 +322,8 @@ export function App() {
             onExport={() => active && void exportActive(active.id)}
             onShare={() => active && void share(active.id)}
             onDownload={() => active && downloadFile(active.id)}
+            onPost={() => active && void postNow(active.id)}
+            canPost={accounts.tiktok.connected || accounts.youtube.connected}
           />
         )}
         {view === "library" && (
@@ -207,9 +347,18 @@ export function App() {
             onQueue={queueShort}
             onShare={(id) => void share(id)}
             onDownload={(id) => downloadFile(id)}
+            onPost={(id) => void postNow(id)}
+            canPost={accounts.tiktok.connected || accounts.youtube.connected}
           />
         )}
-        {view === "channel" && <ChannelView channel={channel} onChange={setChannel} />}
+        {view === "channel" && (
+          <ChannelView
+            channel={channel}
+            onChange={setChannel}
+            accounts={accounts}
+            onDisconnect={(target) => void disconnectAccount(target).then(() => refreshAccounts())}
+          />
+        )}
       </main>
     </div>
   );
@@ -231,6 +380,8 @@ function CreateView({
   onExport,
   onShare,
   onDownload,
+  onPost,
+  canPost,
 }: {
   idea: string;
   setIdea: (value: string) => void;
@@ -247,6 +398,8 @@ function CreateView({
   onExport: () => void;
   onShare: () => void;
   onDownload: () => void;
+  onPost: () => void;
+  canPost: boolean;
 }) {
   return (
     <section className="page create-page">
@@ -256,8 +409,8 @@ function CreateView({
           <h1>Type one idea. Get a TikTok-style Short.</h1>
         </div>
         <p className="lede">
-          One idea becomes a script, voice, and 9:16 video automatically. Share the file to TikTok or
-          YouTube — this desk cannot log into those apps for you. Sample shorts are marked.
+          One idea becomes a script, voice, and 9:16 video. Connect TikTok in Channel and new Shorts
+          post by themselves. Sample shorts are marked.
         </p>
       </header>
 
@@ -292,7 +445,7 @@ function CreateView({
         {buildNote ? <p className="build-note">{buildNote}</p> : null}
         <p className="muted auto-line">
           {auto
-            ? "Auto is on: voice, 9:16 video, queue tonight, then share."
+            ? "Auto is on: voice, video, queue, and post to any connected account."
             : "Auto is off: script only. Turn it on in Channel."}
         </p>
       </form>
@@ -321,9 +474,15 @@ function CreateView({
             <div className="actions">
               {fileReady ? (
                 <>
-                  <button type="button" className="btn primary" onClick={onShare}>
-                    Share to TikTok
-                  </button>
+                  {canPost ? (
+                    <button type="button" className="btn primary" disabled={busy} onClick={onPost}>
+                      Post now
+                    </button>
+                  ) : (
+                    <button type="button" className="btn primary" onClick={onShare}>
+                      Share to TikTok
+                    </button>
+                  )}
                   <button type="button" className="btn" onClick={onDownload}>
                     Download video
                   </button>
@@ -343,6 +502,7 @@ function CreateView({
                 Open library
               </button>
             </div>
+            {active.postNote ? <p className="build-note">{active.postNote}</p> : null}
           </article>
         </div>
       ) : (
@@ -384,6 +544,7 @@ function LibraryView({
                 {short.status} · {durationLabel(short)}
                 {short.sample ? " · sample" : ""}
                 {hasFile(short.id) ? " · video" : ""}
+                {short.postedTo?.length ? " · posted" : ""}
               </p>
               <div className="actions tight">
                 <button type="button" className="btn small" onClick={() => onOpen(short.id)}>
@@ -407,12 +568,16 @@ function QueueView({
   onQueue,
   onShare,
   onDownload,
+  onPost,
+  canPost,
 }: {
   shorts: Short[];
   onOpen: (id: string) => void;
   onQueue: (id: string, when: number | null, status: Short["status"]) => void;
   onShare: (id: string) => void;
   onDownload: (id: string) => void;
+  onPost: (id: string) => void;
+  canPost: boolean;
 }) {
   return (
     <section className="page">
@@ -422,8 +587,8 @@ function QueueView({
           <h1>When the channel posts</h1>
         </div>
         <p className="lede">
-          The queue is a posting calendar in this browser. When a time hits, share the video file to
-          TikTok or YouTube — the studio cannot post into those apps by itself.
+          When a time hits, the desk posts to any TikTok or YouTube account you connected. Keep this
+          tab open, or tap Post now.
         </p>
       </header>
       <ul className="queue">
@@ -434,9 +599,15 @@ function QueueView({
               <strong>{short.title}</strong>
               <p className="muted">
                 {queueLabel(short)} · {short.niche}
+                {short.postNote ? ` · ${short.postNote}` : ""}
               </p>
             </div>
             <div className="actions tight">
+              {hasFile(short.id) && canPost ? (
+                <button type="button" className="btn small" onClick={() => onPost(short.id)}>
+                  Post
+                </button>
+              ) : null}
               {hasFile(short.id) ? (
                 <button type="button" className="btn small" onClick={() => onShare(short.id)}>
                   Share
@@ -464,9 +635,13 @@ function QueueView({
 function ChannelView({
   channel,
   onChange,
+  accounts,
+  onDisconnect,
 }: {
   channel: Channel;
   onChange: (channel: Channel) => void;
+  accounts: { tiktok: AccountStatus; youtube: AccountStatus };
+  onDisconnect: (target: "tiktok" | "youtube") => void;
 }) {
   function patch<K extends keyof Channel>(key: K, value: Channel[K]) {
     onChange({ ...channel, [key]: value });
@@ -479,7 +654,7 @@ function ChannelView({
           <p className="kicker">Channel</p>
           <h1>Brand the desk once</h1>
         </div>
-        <p className="lede">Style, voice, and auto-export stick to every Short you build after this.</p>
+        <p className="lede">Style, voice, and auto-post stick to every Short you build after this.</p>
       </header>
       <label className="auto-toggle">
         <input
@@ -488,10 +663,24 @@ function ChannelView({
           onChange={(event) => patch("auto", event.target.checked)}
         />
         <span>
-          <strong>Auto export</strong>
-          <em>Build writes the voice, records a 9:16 video, and queues it tonight. You still share the file to TikTok.</em>
+          <strong>Auto post</strong>
+          <em>Build writes the voice, records a 9:16 video, queues it, and posts to connected TikTok and YouTube accounts.</em>
         </span>
       </label>
+      <div className="account-row">
+        <AccountCard
+          title="TikTok"
+          account={accounts.tiktok}
+          href="/api/tiktok/start"
+          onDisconnect={() => onDisconnect("tiktok")}
+        />
+        <AccountCard
+          title="YouTube"
+          account={accounts.youtube}
+          href="/api/youtube/start"
+          onDisconnect={() => onDisconnect("youtube")}
+        />
+      </div>
       <div className="channel-form">
         <label>
           Channel name
@@ -543,5 +732,45 @@ function ChannelView({
         ))}
       </div>
     </section>
+  );
+}
+
+function AccountCard({
+  title,
+  account,
+  href,
+  onDisconnect,
+}: {
+  title: string;
+  account: AccountStatus;
+  href: string;
+  onDisconnect: () => void;
+}) {
+  const staticHost = account.error === "static";
+  return (
+    <div className="ref-card">
+      <p className="kicker">{title}</p>
+      <strong>
+        {account.connected ? `Connected · ${account.name || title}` : `${title} not connected`}
+      </strong>
+      <p>
+        {account.connected
+          ? "New Shorts post to this account when Auto post is on."
+          : staticHost
+            ? "This GitHub Pages copy cannot log into TikTok. Use the Cursor-hosted app with secrets."
+            : account.configured
+              ? `Connect ${title} once. The desk then posts by itself.`
+              : `Add ${title === "TikTok" ? "TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET" : "YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET"} in Cursor Secrets, then connect.`}
+      </p>
+      {account.connected ? (
+        <button type="button" className="btn" onClick={onDisconnect}>
+          Disconnect
+        </button>
+      ) : staticHost || !account.configured ? null : (
+        <a className="btn primary" href={href}>
+          Connect {title}
+        </a>
+      )}
+    </div>
   );
 }

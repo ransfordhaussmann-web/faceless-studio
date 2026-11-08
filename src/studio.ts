@@ -47,6 +47,8 @@ export type Short = {
   audioSeconds?: number;
   fileName?: string;
   exported?: boolean;
+  postedTo?: string[];
+  postNote?: string;
 };
 
 export type Channel = {
