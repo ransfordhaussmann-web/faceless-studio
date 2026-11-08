@@ -11,7 +11,7 @@ type Page = {
 type Pages = { data?: Page[] };
 
 export async function GET(request: Request): Promise<Response> {
-  const home = `${originOf(request)}/?view=channel`;
+  const home = `${originOf(request)}/?live=1`;
   if (!metaConfigured()) return Response.redirect(`${home}&meta=missing`, 302);
   const url = new URL(request.url);
   const code = url.searchParams.get("code");

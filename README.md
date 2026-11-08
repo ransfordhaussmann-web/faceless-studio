@@ -2,7 +2,7 @@
 
 A copy of the DailyinfoRH **AI Content Control Room** desk: social channel cards, bilingual production/approval, agent demo floor, plus the Faceless Shorts studio for 9:16 video.
 
-Open the control room first. Use **Open Shorts desk** (or `?app=studio`) for the isometric TikTok explainer pipeline. Connect **TikTok**, **Instagram Reels**, **Facebook**, and **YouTube** with official OAuth. App keys live in Cursor Secrets — never in the repo. First synthesized Short downloads the Mini model (~78 MB) and needs WebGPU (Chrome, Edge, or Safari 26+).
+Open the control room first — channel cards show **your live account stats** after OAuth. **Open demo** is only a practice floor with sample agents. Use **Open Shorts desk** (or `?app=studio`) for the isometric TikTok explainer pipeline. Connect **TikTok**, **Instagram Reels**, **Facebook**, and **YouTube** with official OAuth. App keys live in Cursor Secrets — never in the repo. First synthesized Short downloads the Mini model (~78 MB) and needs WebGPU (Chrome, Edge, or Safari 26+).
 
 ## Run
 

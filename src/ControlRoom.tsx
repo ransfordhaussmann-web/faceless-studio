@@ -33,6 +33,10 @@ export function ControlRoom({ onOpenStudio }: Props) {
           <button className="btn" type="button" onClick={onOpenStudio}>
             Open Shorts desk
           </button>
+          <span className="live" id="live-accounts" hidden>
+            <i className="dot" />
+            Live accounts
+          </span>
           <button className="btn" id="mode" aria-pressed="false" type="button">
             Open demo
           </button>
@@ -154,7 +158,9 @@ export function ControlRoom({ onOpenStudio }: Props) {
               <dt>Videos published</dt>
               <dd id="youtube-posts">—</dd>
             </dl>
-            <a href="/api/youtube/start">Connect YouTube ↗</a>
+            <a id="youtube-link" href="/api/youtube/start">
+              Connect YouTube ↗
+            </a>
           </article>
           <article className="panel channel" style={{ ["--accent" as string]: "#56e6ec" }}>
             <span className="badge-icon" aria-hidden="true">
@@ -166,14 +172,16 @@ export function ControlRoom({ onOpenStudio }: Props) {
               Awaiting data
             </span>
             <dl>
-              <dt>Video views</dt>
+              <dt>Profile likes</dt>
               <dd id="tiktok-views">—</dd>
               <dt>Followers</dt>
               <dd id="tiktok-followers">—</dd>
               <dt>Videos published</dt>
               <dd id="tiktok-posts">—</dd>
             </dl>
-            <a href="/api/tiktok/start">Connect TikTok ↗</a>
+            <a id="tiktok-link" href="/api/tiktok/start">
+              Connect TikTok ↗
+            </a>
           </article>
           <article className="panel channel" style={{ ["--accent" as string]: "#ff67c6" }}>
             <span className="badge-icon" aria-hidden="true">
@@ -192,7 +200,9 @@ export function ControlRoom({ onOpenStudio }: Props) {
               <dt>Feed posts + Reels</dt>
               <dd id="instagram-posts">—</dd>
             </dl>
-            <a href="/api/meta/start">Connect Instagram Reels ↗</a>
+            <a id="instagram-link" href="/api/meta/start">
+              Connect Instagram Reels ↗
+            </a>
           </article>
           <article className="panel channel" style={{ ["--accent" as string]: "#82a3ff" }}>
             <span className="badge-icon" aria-hidden="true">
@@ -211,20 +221,19 @@ export function ControlRoom({ onOpenStudio }: Props) {
               <dt>Feed posts + Reels</dt>
               <dd id="facebook-posts">—</dd>
             </dl>
-            <a href="/api/meta/start">Connect Facebook ↗</a>
+            <a id="facebook-link" href="/api/meta/start">
+              Connect Facebook ↗
+            </a>
           </article>
         </div>
 
         <section className="panel intro">
           <h3>Account access</h3>
-          <p className="setup-note">
-            Connect TikTok, Instagram Reels, Facebook, and YouTube through the official OAuth buttons above
-            (Cursor-hosted app with secrets). Metricool-style numbers are a snapshot for the desk. Open the
-            demo to try the approval workflow with sample data, or open the Shorts desk to build 9:16 videos.
+          <p className="setup-note" id="account-access-note">
+            Tap Connect on each card and log into your real TikTok, Instagram, Facebook Page, and YouTube
+            accounts. Numbers update from those logins. This needs the Cursor-hosted app with secrets — the
+            GitHub Pages phone copy cannot store them. Open demo is only a practice floor with sample data.
           </p>
-          <a href="https://help.metricool.com/how-to-connect-social-media-and-ad-platforms-to-metricool-qrkvn">
-            See Metricool’s connection guide ↗
-          </a>
         </section>
       </section>
 
@@ -336,7 +345,8 @@ export function ControlRoom({ onOpenStudio }: Props) {
         </aside>
       </div>
       <footer id="demo-footer" hidden>
-        Interactive simulation · All metrics, agents, and publishing activity are demo data.
+        Interactive simulation · Agents and approval queue are demo data. Connected channel stats stay live
+        on Back to channels.
       </footer>
       <dialog id="dialog" aria-labelledby="dialog-title" />
       <div id="toast" className="toast" role="status" />

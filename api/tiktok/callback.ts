@@ -2,7 +2,7 @@ import { originOf, readCookie } from "../_lib/http";
 import { displayName, redirectUri, sessionCookie, TT_STATE, tiktokConfigured } from "../_lib/tiktok";
 
 export async function GET(request: Request): Promise<Response> {
-  const home = `${originOf(request)}/?view=channel`;
+  const home = `${originOf(request)}/?live=1`;
   if (!tiktokConfigured()) {
     return Response.redirect(`${home}&tiktok=missing`, 302);
   }

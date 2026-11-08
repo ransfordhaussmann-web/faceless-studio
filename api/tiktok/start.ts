@@ -12,7 +12,7 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL("https://www.tiktok.com/v2/auth/authorize/");
   url.searchParams.set("client_key", process.env.TIKTOK_CLIENT_KEY ?? "");
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "user.info.basic,video.publish,video.upload");
+  url.searchParams.set("scope", "user.info.basic,user.info.stats,video.publish,video.upload");
   url.searchParams.set("redirect_uri", `${originOf(request)}/api/tiktok/callback`);
   url.searchParams.set("state", state);
   return new Response(null, {

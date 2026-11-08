@@ -142,26 +142,64 @@ export function bootControlRoom() {
 
   async function loadMetrics(){
    const status=$('metrics-status');
+   const range=$('metrics-range');
+   const liveBadge=$('live-accounts');
+   const access=$('account-access-note');
    try{
-    const response=await fetch('/api/channel-metrics',{cache:'no-store'});
+    const response=await fetch('/api/channel-metrics',{credentials:'include',cache:'no-store'});
     if(!response.ok)throw new Error('Could not load metrics');
     const {snapshot}=await response.json();
-    if(!snapshot){status.textContent='Waiting for the first Metricool import.';return;}
-    const dateOptions={timeZone:'Europe/Zurich',dateStyle:'medium'};
-    const formatDate=value=>new Date(value+'T12:00:00Z').toLocaleDateString('en-CH',dateOptions);
-    const checked=new Date(snapshot.checkedAt).toLocaleString('en-CH',{...dateOptions,timeStyle:'short'});
+    if(!snapshot?.channels){status.textContent='Connect your accounts below to load live stats.';return;}
+    const dateOptions={timeZone:'Europe/Zurich',dateStyle:'medium',timeStyle:'short'};
+    const checked=new Date(snapshot.checkedAt).toLocaleString('en-CH',dateOptions);
     const count=new Intl.NumberFormat('en-CH');
+    const labels={youtube:'YouTube',tiktok:'TikTok',instagram:'Instagram',facebook:'Facebook'};
+    let connected=0;
     for(const [network, metrics] of Object.entries(snapshot.channels)){
-     $(network+'-status').textContent='Connected in Metricool';
-     for(const [metric,value] of Object.entries(metrics)){
-      $(network+'-'+metric).textContent=value===null?'—':count.format(value);
+     const statusEl=$(network+'-status');
+     const link=$(network+'-link');
+     if(metrics.connected){
+      connected+=1;
+      statusEl.textContent='Live · '+(metrics.name || labels[network]);
+      statusEl.style.color='var(--green)';
+      if(link){
+       link.textContent='Connected · '+ (metrics.name || labels[network]);
+       link.removeAttribute('href');
+       link.setAttribute('aria-disabled','true');
+      }
+     }else{
+      statusEl.textContent=metrics.configured===false?'Needs app keys': (metrics.error || 'Not connected');
+      statusEl.style.color='';
+      if(link){
+       link.textContent='Connect '+labels[network]+' ↗';
+       link.href=metrics.href || ('/api/'+(network==='instagram'||network==='facebook'?'meta':network)+'/start');
+      }
      }
+     $(''+network+'-views').textContent=metrics.views===null||metrics.views===undefined?'—':count.format(metrics.views);
+     $(''+network+'-followers').textContent=metrics.followers===null||metrics.followers===undefined?'—':count.format(metrics.followers);
+     $(''+network+'-posts').textContent=metrics.posts===null||metrics.posts===undefined?'—':count.format(metrics.posts);
     }
-    status.textContent='4 of 4 accounts connected in Metricool · Last import '+checked+' (Zurich)';
-    const range=$('metrics-range');
-    range.textContent='Reporting period '+formatDate(snapshot.from)+' to '+formatDate(snapshot.to)+' · Followers and subscribers use the latest available count in that period.';
-    range.hidden=false;
-   }catch{status.textContent='Could not load the Metricool snapshot. Reload the page to try again.';}
+    if(liveBadge) liveBadge.hidden=connected===0;
+    if(connected){
+     status.textContent=connected+' of 4 accounts live · Last refresh '+checked+' (Zurich)';
+     range.textContent='Stats come from your TikTok, YouTube, Instagram, and Facebook logins — not demo data.';
+     range.hidden=false;
+     if(access) access.textContent='Your connected accounts are live on this desk. Open demo is still a practice floor. Open Shorts desk to build and auto-post 9:16 videos to these accounts.';
+    }else{
+     status.textContent='No live accounts yet. Connect TikTok, Instagram, Facebook, and YouTube below.';
+     range.textContent='Use the Cursor-hosted app with secrets filled in. GitHub Pages cannot log you in.';
+     range.hidden=false;
+    }
+    const params=new URLSearchParams(window.location.search);
+    if(params.get('tiktok')==='connected') toast('TikTok connected · live on this desk.');
+    if(params.get('youtube')==='connected') toast('YouTube connected · live on this desk.');
+    if(params.get('meta')==='connected') toast('Facebook / Reels connected · live on this desk.');
+    if(params.get('tiktok')==='missing'||params.get('youtube')==='missing'||params.get('meta')==='missing'){
+     toast('Add the app keys in Cursor Secrets, then connect again.');
+    }
+    if(params.get('live')==='1' && connected) toast(connected+' live account'+(connected===1?'':'s')+' on this desk.');
+    if(params.toString()) window.history.replaceState({}, '', window.location.pathname || './');
+   }catch{status.textContent='Could not load live account stats. Reload the page to try again.';}
   }
   loadMetrics();
 

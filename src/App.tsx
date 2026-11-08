@@ -46,10 +46,10 @@ export function App() {
     const params = new URLSearchParams(window.location.search);
     const app = params.get("app");
     if (app === "studio") return "studio";
+    if (params.get("live") === "1") return "control-room";
     if (params.get("view") === "create" || params.get("view") === "library" || params.get("view") === "queue" || params.get("view") === "channel") {
       return "studio";
     }
-    if (params.get("tiktok") || params.get("youtube") || params.get("meta")) return "studio";
     return "control-room";
   });
   const [view, setView] = useState<ViewId>("create");
@@ -78,24 +78,27 @@ export function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const liveReturn = params.get("live") === "1";
     const nextView = params.get("view");
     if (nextView === "create" || nextView === "library" || nextView === "queue" || nextView === "channel") {
       setView(nextView);
     }
-    const tiktok = params.get("tiktok");
-    const youtube = params.get("youtube");
-    if (tiktok === "connected") setBuildNote("TikTok connected. New Shorts will post automatically.");
-    if (tiktok === "denied") setBuildNote("TikTok login was cancelled.");
-    if (tiktok === "missing") setBuildNote("Add TikTok keys in Cursor Secrets, then connect again.");
-    if (youtube === "connected") setBuildNote("YouTube connected. New Shorts will post automatically.");
-    if (youtube === "denied") setBuildNote("YouTube login was cancelled.");
-    if (youtube === "missing") setBuildNote("Add YouTube keys in Cursor Secrets, then connect again.");
-    const meta = params.get("meta");
-    if (meta === "connected") setBuildNote("Facebook connected. Reels and Page posts will go out automatically.");
-    if (meta === "denied") setBuildNote("Facebook login was cancelled.");
-    if (meta === "missing") setBuildNote("Add Facebook keys in Cursor Secrets, then connect again.");
-    if (meta === "nopage") setBuildNote("Facebook login worked, but no Page was found. Create a Page, then connect again.");
-    if (params.toString()) window.history.replaceState({}, "", window.location.pathname || "./");
+    if (!liveReturn) {
+      const tiktok = params.get("tiktok");
+      const youtube = params.get("youtube");
+      if (tiktok === "connected") setBuildNote("TikTok connected. New Shorts will post automatically.");
+      if (tiktok === "denied") setBuildNote("TikTok login was cancelled.");
+      if (tiktok === "missing") setBuildNote("Add TikTok keys in Cursor Secrets, then connect again.");
+      if (youtube === "connected") setBuildNote("YouTube connected. New Shorts will post automatically.");
+      if (youtube === "denied") setBuildNote("YouTube login was cancelled.");
+      if (youtube === "missing") setBuildNote("Add YouTube keys in Cursor Secrets, then connect again.");
+      const meta = params.get("meta");
+      if (meta === "connected") setBuildNote("Facebook connected. Reels and Page posts will go out automatically.");
+      if (meta === "denied") setBuildNote("Facebook login was cancelled.");
+      if (meta === "missing") setBuildNote("Add Facebook keys in Cursor Secrets, then connect again.");
+      if (meta === "nopage") setBuildNote("Facebook login worked, but no Page was found. Create a Page, then connect again.");
+      if (params.toString()) window.history.replaceState({}, "", window.location.pathname || "./");
+    }
     void refreshAccounts();
   }, []);
 
