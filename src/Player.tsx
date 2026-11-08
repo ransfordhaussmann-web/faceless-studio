@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Channel, Short } from "./studio";
 import { boardOf, handleOf, scriptText } from "./studio";
-import { playWav, yapperVoiceName, yapperWav } from "./tts";
+import { playSrc, playWav, yapperVoiceName, yapperWav } from "./tts";
 
 type PlayerProps = {
   short: Short;
@@ -23,6 +23,7 @@ export function Player({ short, channel, autoPlay = false, onEnded }: PlayerProp
   const narration = useMemo(() => short.beats.map((beat) => beat.line), [short]);
   const handle = handleOf(channel.name);
   const yapper = yapperVoiceName(short.voice);
+  const usingClip = Boolean(short.audioSrc && short.cues?.length);
 
   useEffect(() => {
     run.current += 1;
@@ -47,9 +48,30 @@ export function Player({ short, channel, autoPlay = false, onEnded }: PlayerProp
     const token = ++run.current;
     stopClip.current?.();
     setPlaying(true);
-    setStage("Loading Yapper Mini…");
     const start = index >= narration.length ? 0 : index;
     try {
+      if (usingClip && short.audioSrc && short.cues) {
+        setIndex(start);
+        setCaption(short.beats[start]?.caption ?? "");
+        setStage("");
+        const clip = playSrc(short.audioSrc, short.cues[start] ?? 0, (seconds) => {
+          if (token !== run.current) return;
+          let next = 0;
+          for (let i = 0; i < short.cues!.length; i += 1) {
+            if (seconds + 0.04 >= short.cues![i]) next = i;
+          }
+          setIndex(next);
+          setCaption(short.beats[next]?.caption ?? "");
+        });
+        stopClip.current = clip.stop;
+        await clip.done;
+        if (token !== run.current) return;
+        setPlaying(false);
+        setStage("");
+        ended.current?.();
+        return;
+      }
+      setStage("Loading Yapper Mini…");
       for (let cursor = start; cursor < narration.length; cursor += 1) {
         if (token !== run.current) return;
         setIndex(cursor);
@@ -128,7 +150,12 @@ export function Player({ short, channel, autoPlay = false, onEnded }: PlayerProp
           {playing ? "Pause" : "Play preview"}
         </button>
         <p className="muted">
-          {index + 1}/{short.beats.length} · Yapper Mini · {yapper}
+          {index + 1}/{short.beats.length} ·{" "}
+          {usingClip
+            ? "Science Explainer · your clip"
+            : short.voice === "explainer"
+              ? "Yapper Mini · Jasper matching your clip"
+              : `Yapper Mini · ${yapper}`}
           {stage ? ` · ${stage}` : ""}
         </p>
         <p className="sr-only">{scriptText(short)}</p>
@@ -186,17 +213,17 @@ function IsoBoard({
             <div className="desk d1">
               <span className="screen" />
               <span className="fig blue" />
-              <em>Ads</em>
+              <em>{board.desks[0]}</em>
             </div>
             <div className="desk d2">
               <span className="screen" />
               <span className="fig pink" />
-              <em>Copy</em>
+              <em>{board.desks[1]}</em>
             </div>
             <div className="desk d3">
               <span className="screen" />
               <span className="fig mint" />
-              <em>Book</em>
+              <em>{board.desks[2]}</em>
             </div>
             <div className="plant" />
           </div>

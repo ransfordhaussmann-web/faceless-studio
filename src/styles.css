@@ -371,6 +371,17 @@ textarea, input {
 
 .channel-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .channel-form label { display: grid; gap: 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.ref-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  padding: 16px 18px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.ref-card strong { font-size: 16px; }
+.ref-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+.ref-card audio { width: 100%; margin-top: 6px; }
 .choice-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
 .choice { display: grid; gap: 6px; padding: 12px; text-align: left; cursor: pointer; }
 .choice em { font-style: normal; color: var(--muted); font-size: 13px; }

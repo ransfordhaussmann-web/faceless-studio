@@ -8,7 +8,16 @@ export type ArtStyleId =
   | "mosaic"
   | "brass";
 
-export type VoiceId = "bella" | "luna" | "rosie" | "kiki" | "jasper" | "bruno" | "hugo" | "leo";
+export type VoiceId =
+  | "explainer"
+  | "bella"
+  | "luna"
+  | "rosie"
+  | "kiki"
+  | "jasper"
+  | "bruno"
+  | "hugo"
+  | "leo";
 
 export type ShortStatus = "draft" | "ready" | "queued" | "posted";
 
@@ -33,6 +42,9 @@ export type Short = {
   sample: boolean;
   createdAt: number;
   queuedAt: number | null;
+  audioSrc?: string;
+  cues?: number[];
+  audioSeconds?: number;
 };
 
 export type Channel = {
@@ -66,6 +78,7 @@ export const ART_STYLES: ArtStyle[] = [
 ];
 
 export const VOICES: Voice[] = [
+  { id: "explainer", name: "Science Explainer", note: "Your clip · Mini Jasper" },
   { id: "bella", name: "Bella", note: "Yapper Mini · bright" },
   { id: "luna", name: "Luna", note: "Yapper Mini · even" },
   { id: "rosie", name: "Rosie", note: "Yapper Mini · warm" },
@@ -85,7 +98,9 @@ export const PIPELINE = [
   "Ready",
 ] as const;
 
-const STORAGE_KEY = "faceless-studio-v3";
+export const EXPLAINER_SRC = `${import.meta.env.BASE_URL}voices/science-explainer.mp3`;
+
+const STORAGE_KEY = "faceless-studio-v4";
 
 type Stored = {
   channel: Channel;
@@ -94,9 +109,9 @@ type Stored = {
 
 export const defaultChannel = (): Channel => ({
   name: "Night Desk",
-  niche: "AI workflows for agencies",
-  style: "neon",
-  voice: "bella",
+  niche: "Science explainers",
+  style: "star",
+  voice: "explainer",
 });
 
 export type BoardTask = {
@@ -110,6 +125,7 @@ export type Board = {
   brand: string;
   pills: string[];
   tasks: BoardTask[];
+  desks: string[];
   stat: number;
 };
 
@@ -120,13 +136,24 @@ export function handleOf(name: string): string {
 const TONES = ["#ff4d6d", "#3dffb0", "#ffb020", "#6aa8ff", "#c084fc"];
 
 const FLOOR_JOBS = ["Outreach sequence", "Ad variants", "Booking follow-up", "Client brief", "Caption pack"];
+const SCIENCE_JOBS = ["Fossil layer", "Isotope clock", "Tech species", "Buried tools", "Implication"];
+
+function isScience(short: Short): boolean {
+  return (
+    short.niche.toLowerCase() === "science" ||
+    /\b(space|planet|alien|civilizations?|fossils?|galaxy|ocean|quantum|atom)\b/i.test(short.idea)
+  );
+}
 
 export function boardOf(short: Short, brand: string): Board {
-  const pills =
-    short.niche.toLowerCase().includes("ai") || /\bagent|chatgpt|workflow\b/i.test(short.idea)
+  const science = isScience(short);
+  const pills = science
+    ? ["Deep time", "Earth", "Space", "Record"]
+    : short.niche.toLowerCase().includes("ai") || /\bagent|chatgpt|workflow\b/i.test(short.idea)
       ? ["Restaurant", "Dental clinic", "Online store", "Fitness studio"]
       : [short.niche, "Brief", "Ads", "Social"].slice(0, 4);
-  const tasks: BoardTask[] = FLOOR_JOBS.map((name, index) => ({
+  const jobs = science ? SCIENCE_JOBS : FLOOR_JOBS;
+  const tasks: BoardTask[] = jobs.map((name, index) => ({
     name,
     step: `Step ${Math.min(index + 1, 6)} of 6`,
     pct: [28, 45, 62, 83, 100][index] ?? 70,
@@ -136,6 +163,7 @@ export function boardOf(short: Short, brand: string): Board {
     brand: brand || "Studio",
     pills,
     tasks,
+    desks: science ? ["Scan", "Date", "Map"] : ["Ads", "Copy", "Book"],
     stat: 120 + (short.title.length * 11) % 90,
   };
 }
@@ -174,7 +202,9 @@ function nicheFrom(channel: Channel, idea: string): string {
   const lower = idea.toLowerCase();
   if (/\b(tomb|pharaoh|empire|war|king|queen|ancient|medieval)\b/.test(lower)) return "History";
   if (/\b(ai|agent|chatgpt|workflow|agency)\b/.test(lower)) return "AI";
-  if (/\b(space|planet|atom|brain|ocean|virus|quantum)\b/.test(lower)) return "Science";
+  if (/\b(space|planet|atom|brain|ocean|virus|quantum|alien|civilizations?|fossils?|galaxy|dinosaur)\b/.test(lower)) {
+    return "Science";
+  }
   if (/\b(money|bank|gold|trade|market)\b/.test(lower)) return "Money";
   if (/\b(myth|ghost|legend|curse|secret)\b/.test(lower)) return "Story";
   return channel.niche.split(" ")[0] || "Explainer";
@@ -187,14 +217,49 @@ function punchyHook(idea: string): string {
   return `${words.slice(0, 5).join(" ")}… 👀`;
 }
 
-export function generateShort(idea: string, channel: Channel): Short {
-  const source = cleanIdea(idea) || "AI agents running a whole marketing team";
-  const title = titleFrom(source);
-  const subject = source.replace(/[.?!]+$/g, "");
-  const niche = nicheFrom(channel, source);
-  const hook = punchyHook(source);
+function scienceBeats(subject: string, channel: Channel, hook: string): Beat[] {
+  return [
+    {
+      id: uid("beat"),
+      heading: "Hook",
+      line: `When we think about ${subject}, we tend to look at the obvious story on the surface.`,
+      caption: hook,
+    },
+    {
+      id: uid("beat"),
+      heading: "Setup",
+      line: "But there is another dimension we might be giving too little thought to.",
+      caption: "There's another dimension.",
+    },
+    {
+      id: uid("beat"),
+      heading: "Beat",
+      line: `Look closer, and ${subject} is not trivia. It becomes a timeline.`,
+      caption: "It becomes a timeline.",
+    },
+    {
+      id: uid("beat"),
+      heading: "Beat",
+      line: "Tools, leftovers, and whole species pile up. Most of that record is easy to miss.",
+      caption: "Most of the record is easy to miss.",
+    },
+    {
+      id: uid("beat"),
+      heading: "Turn",
+      line: "The question is not only what happened. It is what still sits under our feet.",
+      caption: "What's still under our feet?",
+    },
+    {
+      id: uid("beat"),
+      heading: "Close",
+      line: `That is the implication ${channel.name} keeps coming back to. One idea. One Short.`,
+      caption: "One idea. One Short.",
+    },
+  ];
+}
 
-  const beats: Beat[] = [
+function floorBeats(title: string, subject: string, channel: Channel, hook: string): Beat[] {
+  return [
     {
       id: uid("beat"),
       heading: "Hook",
@@ -210,13 +275,13 @@ export function generateShort(idea: string, channel: Channel): Short {
     {
       id: uid("beat"),
       heading: "Beat",
-      line: `Put the work on desks: briefs, ads, booking, follow-up. Each desk is an agent with a job.`,
+      line: "Put the work on desks: briefs, ads, booking, follow-up. Each desk is an agent with a job.",
       caption: "Give every job a desk.",
     },
     {
       id: uid("beat"),
       heading: "Beat",
-      line: `They pass the file, not the vibe. Outreach. Tracking. Copy. The queue moves while you sleep.`,
+      line: "They pass the file, not the vibe. Outreach. Tracking. Copy. The queue moves while you sleep.",
       caption: "The queue moves at night.",
     },
     {
@@ -232,6 +297,15 @@ export function generateShort(idea: string, channel: Channel): Short {
       caption: "One line. Whole team.",
     },
   ];
+}
+
+export function generateShort(idea: string, channel: Channel): Short {
+  const source = cleanIdea(idea) || "AI agents running a whole marketing team";
+  const title = titleFrom(source);
+  const subject = source.replace(/[.?!]+$/g, "");
+  const niche = nicheFrom(channel, source);
+  const hook = punchyHook(source);
+  const beats = niche === "Science" ? scienceBeats(subject, channel, hook) : floorBeats(title, subject, channel, hook);
 
   return {
     id: uid("short"),
@@ -256,7 +330,35 @@ function sampleShorts(channel: Channel): Short[] {
     style: ArtStyleId;
     captions: string[];
     lines: string[];
+    audioSrc?: string;
+    cues?: number[];
+    audioSeconds?: number;
   }> = [
+    {
+      idea: "when we think about alien civilizations we look to space, not time",
+      title: "When we think about alien civilizations",
+      niche: "Science",
+      style: "star",
+      audioSrc: EXPLAINER_SRC,
+      cues: [0, 8.74, 15.22, 16.8, 24.46, 32.88],
+      audioSeconds: 42,
+      captions: [
+        "Alien civilizations… 👀",
+        "We look to faraway planets.",
+        "Time.",
+        "Other civilizations. On Earth?",
+        "Buried under our feet.",
+        "What does that mean for us?",
+      ],
+      lines: [
+        "When we think about alien civilizations, we tend to look into the vastness of space to far away planet.",
+        "But there is another incredibly vast dimension that we might be giving too little thought to.",
+        "Time.",
+        "Could it be that over the last hundreds of millions of years other civilizations existed on Earth?",
+        "Indigenous technological species that rose and died out and that they owe their artifacts a buried beneath our feet.",
+        "What designs have to say about this and what the implications for us?",
+      ],
+    },
     {
       idea: "AI agent workflows can coordinate entire marketing teams",
       title: "You're using ChatGPT wrong",
@@ -277,28 +379,6 @@ function sampleShorts(channel: Channel): Short[] {
         "They pass the file. The floor keeps moving.",
         "That is a workflow, not a prompt.",
         "Stay if you still run this in one chat.",
-      ],
-    },
-    {
-      idea: "why the ocean has a memory",
-      title: "Why the ocean has a memory",
-      niche: "Science",
-      style: "star",
-      captions: [
-        "The ocean keeps notes 👀",
-        "Heat does not refresh.",
-        "Last summer is still down there.",
-        "A calm surface can still argue.",
-        "It is not moody. It files.",
-        "One line. Next Short.",
-      ],
-      lines: [
-        "Water keeps the heat of summers you do not remember.",
-        "The deep does not refresh like a feed. It files.",
-        "A current can carry last decade's warmth under this week's storm.",
-        "That is why a calm surface can still be an argument.",
-        "The ocean is not moody. It is keeping notes.",
-        "One idea. A faceless Short. Stay for the next note.",
       ],
     },
     {
@@ -342,6 +422,9 @@ function sampleShorts(channel: Channel): Short[] {
     sample: true,
     createdAt: Date.now() - (index + 2) * 86_400_000,
     queuedAt: index === 2 ? Date.now() + 36_000_000 : null,
+    audioSrc: seed.audioSrc,
+    cues: seed.cues,
+    audioSeconds: seed.audioSeconds,
   }));
 }
 
@@ -368,6 +451,7 @@ export function scriptText(short: Short): string {
 }
 
 export function durationLabel(short: Short): string {
+  if (short.audioSeconds) return `${Math.round(short.audioSeconds)}s`;
   const words = scriptText(short).split(/\s+/).filter(Boolean).length;
   const seconds = Math.max(28, Math.round((words / 2.4) * 10) / 10);
   const whole = Math.round(seconds);

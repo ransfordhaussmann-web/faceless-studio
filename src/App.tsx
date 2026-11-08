@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Player } from "./Player";
 import {
   ART_STYLES,
+  EXPLAINER_SRC,
   PIPELINE,
   VOICES,
   durationLabel,
@@ -157,7 +158,7 @@ function CreateView({
         </div>
         <p className="lede">
           Teal isometric board, outlined captions, and a 9:16 TikTok frame — a faceless explainer
-          workflow with no camera. Previews use your browser voice. Sample shorts are marked.
+          workflow with no camera. Voice follows your Science Explainer clip. Sample shorts are marked.
         </p>
       </header>
 
@@ -173,7 +174,7 @@ function CreateView({
           id="idea"
           value={idea}
           onChange={(event) => setIdea(event.target.value)}
-          placeholder="A census of storms kept in a lighthouse log…"
+          placeholder="When we think about alien civilizations…"
           rows={3}
           disabled={busy}
         />
@@ -371,7 +372,18 @@ function ChannelView({
           </button>
         ))}
       </div>
-      <h2 className="sub">Narrator — Yapper Mini</h2>
+      <h2 className="sub">Narrator</h2>
+      <div className="ref-card">
+        <p className="kicker">Voice reference</p>
+        <strong>Science Explainer</strong>
+        <p>
+          The clip you sent — a measured male science narrator. The sample science Short plays that
+          recording. New Shorts use Yapper Mini Jasper at the same low register and pace.
+        </p>
+        <audio controls preload="metadata" src={EXPLAINER_SRC}>
+          Your browser cannot play the reference clip.
+        </audio>
+      </div>
       <div className="choice-row">
         {VOICES.map((voice) => (
           <button
