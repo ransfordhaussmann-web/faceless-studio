@@ -1,6 +1,6 @@
 # Faceless Studio
 
-A content-creator desk for faceless Shorts. Type one idea; the studio writes a six-beat script, lays illustrated scenes in the channel’s art style, speaks a narrator preview in the browser, and files the Short in a library and posting queue.
+A content-creator desk for faceless Shorts in the isometric TikTok explainer style: teal agency board, desks, and huge outlined captions. Type one idea; the studio writes a six-beat script, plays a 9:16 preview with browser narration, and files the Short in a library and posting queue.
 
 This is a local creator tool. Previews use the browser speech engine. They are not rendered MP4s and they are not uploaded to YouTube.
 

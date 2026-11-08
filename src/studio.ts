@@ -83,7 +83,7 @@ export const PIPELINE = [
   "Ready",
 ] as const;
 
-const STORAGE_KEY = "faceless-studio-v1";
+const STORAGE_KEY = "faceless-studio-v2";
 
 type Stored = {
   channel: Channel;
@@ -92,10 +92,51 @@ type Stored = {
 
 export const defaultChannel = (): Channel => ({
   name: "Night Desk",
-  niche: "Strange history and quiet science",
-  style: "ember",
+  niche: "AI workflows for agencies",
+  style: "neon",
   voice: "rowan",
 });
+
+export type BoardTask = {
+  name: string;
+  step: string;
+  pct: number;
+  tone: string;
+};
+
+export type Board = {
+  brand: string;
+  pills: string[];
+  tasks: BoardTask[];
+  stat: number;
+};
+
+export function handleOf(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "") || "studio";
+}
+
+const TONES = ["#ff4d6d", "#3dffb0", "#ffb020", "#6aa8ff", "#c084fc"];
+
+const FLOOR_JOBS = ["Outreach sequence", "Ad variants", "Booking follow-up", "Client brief", "Caption pack"];
+
+export function boardOf(short: Short, brand: string): Board {
+  const pills =
+    short.niche.toLowerCase().includes("ai") || /\bagent|chatgpt|workflow\b/i.test(short.idea)
+      ? ["Restaurant", "Dental clinic", "Online store", "Fitness studio"]
+      : [short.niche, "Brief", "Ads", "Social"].slice(0, 4);
+  const tasks: BoardTask[] = FLOOR_JOBS.map((name, index) => ({
+    name,
+    step: `Step ${Math.min(index + 1, 6)} of 6`,
+    pct: [28, 45, 62, 83, 100][index] ?? 70,
+    tone: TONES[index] ?? "#3dffb0",
+  }));
+  return {
+    brand: brand || "Studio",
+    pills,
+    tasks,
+    stat: 120 + (short.title.length * 11) % 90,
+  };
+}
 
 export function styleOf(id: ArtStyleId): ArtStyle {
   return ART_STYLES.find((item) => item.id === id) ?? ART_STYLES[0];
@@ -123,54 +164,63 @@ function titleFrom(idea: string): string {
 function nicheFrom(channel: Channel, idea: string): string {
   const lower = idea.toLowerCase();
   if (/\b(tomb|pharaoh|empire|war|king|queen|ancient|medieval)\b/.test(lower)) return "History";
+  if (/\b(ai|agent|chatgpt|workflow|agency)\b/.test(lower)) return "AI";
   if (/\b(space|planet|atom|brain|ocean|virus|quantum)\b/.test(lower)) return "Science";
   if (/\b(money|bank|gold|trade|market)\b/.test(lower)) return "Money";
   if (/\b(myth|ghost|legend|curse|secret)\b/.test(lower)) return "Story";
   return channel.niche.split(" ")[0] || "Explainer";
 }
 
+function punchyHook(idea: string): string {
+  const text = cleanIdea(idea).replace(/[.?!]+$/g, "");
+  const words = text.split(" ");
+  if (words.length <= 6) return `${text.charAt(0).toUpperCase()}${text.slice(1)} 👀`;
+  return `${words.slice(0, 5).join(" ")}… 👀`;
+}
+
 export function generateShort(idea: string, channel: Channel): Short {
-  const source = cleanIdea(idea) || "a forgotten library that still answers questions";
+  const source = cleanIdea(idea) || "AI agents running a whole marketing team";
   const title = titleFrom(source);
   const subject = source.replace(/[.?!]+$/g, "");
   const niche = nicheFrom(channel, source);
+  const hook = punchyHook(source);
 
   const beats: Beat[] = [
     {
       id: uid("beat"),
       heading: "Hook",
-      line: `Stop scrolling. ${title.replace(/[.?!…]+$/g, "")} is not the story you were told.`,
-      caption: "This is not the story you were told.",
+      line: `Stop scrolling. ${title.replace(/[.?!…]+$/g, "")} is not a chatbot trick — it is a desk that never clocks out.`,
+      caption: hook,
     },
     {
       id: uid("beat"),
       heading: "Setup",
-      line: `Most people file ${subject} under trivia. The record is messier, and it starts in a room nobody filmed.`,
-      caption: "The record is messier than the headline.",
+      line: `Most people still run ${subject} in one chat window. That is a person. Not a team.`,
+      caption: "One chat is not a team.",
     },
     {
       id: uid("beat"),
       heading: "Beat",
-      line: `First: the official version skips the part that does not fit a thirty-second recap. That gap is where ${subject} actually lives.`,
-      caption: "The official version skips the gap.",
+      line: `Put the work on desks: briefs, ads, booking, follow-up. Each desk is an agent with a job.`,
+      caption: "Give every job a desk.",
     },
     {
       id: uid("beat"),
       heading: "Beat",
-      line: `Then a small, stubborn fact: someone kept the notes, the map, the receipt. Not a legend — a paper trail.`,
-      caption: "Not a legend. A paper trail.",
+      line: `They pass the file, not the vibe. Outreach. Tracking. Copy. The queue moves while you sleep.`,
+      caption: "The queue moves at night.",
     },
     {
       id: uid("beat"),
       heading: "Turn",
-      line: `Here is the turn: once you see that trail, ${subject} stops being content. It becomes a decision someone already made.`,
-      caption: "It was a decision, not a myth.",
+      line: `That is the whole agency floor — without hiring the floor. ${subject} becomes a workflow, not a prompt.`,
+      caption: "That's the whole floor.",
     },
     {
       id: uid("beat"),
       heading: "Close",
-      line: `If this is your niche, stay. ${channel.name} builds the next Short from one line — no camera, no timeline.`,
-      caption: "One line. Next Short. No camera.",
+      line: `If you run this messy, stay. ${channel.name} builds the next faceless Short from one line.`,
+      caption: "One line. Whole team.",
     },
   ];
 
@@ -190,27 +240,50 @@ export function generateShort(idea: string, channel: Channel): Short {
 }
 
 function sampleShorts(channel: Channel): Short[] {
-  const seeds = [
+  const seeds: Array<{
+    idea: string;
+    title: string;
+    niche: string;
+    style: ArtStyleId;
+    captions: string[];
+    lines: string[];
+  }> = [
     {
-      idea: "the tomb no one has opened",
-      title: "The tomb no one has opened",
-      niche: "History",
-      style: "brass" as ArtStyleId,
-      beats: [
-        "They mapped the door. They never turned the key.",
-        "A sealed chamber is not empty. It is postponed.",
-        "The inventory lists honey, linen, and a name with the face scratched out.",
-        "Every century, someone argues for a drill. Every century, someone says wait.",
-        "Waiting is also a kind of opening — just not the kind cameras like.",
-        "Follow for the rooms history left closed.",
+      idea: "AI agent workflows can coordinate entire marketing teams",
+      title: "You're using ChatGPT wrong",
+      niche: "AI",
+      style: "neon",
+      captions: [
+        "You're using ChatGPT wrong 👀",
+        "One chat is not a team.",
+        "Put every job on a desk.",
+        "Outreach. Ads. Booking.",
+        "That's six jobs. Done.",
+        "One line. Whole floor.",
+      ],
+      lines: [
+        "You're using ChatGPT like a person in a box. Agencies do not run on one box.",
+        "A marketing team is desks: brief, ads, social, booking, follow-up.",
+        "Give each desk an agent with a job and a queue.",
+        "They pass the file. The floor keeps moving.",
+        "That is a workflow, not a prompt.",
+        "Stay if you still run this in one chat.",
       ],
     },
     {
       idea: "why the ocean has a memory",
       title: "Why the ocean has a memory",
       niche: "Science",
-      style: "star" as ArtStyleId,
-      beats: [
+      style: "star",
+      captions: [
+        "The ocean keeps notes 👀",
+        "Heat does not refresh.",
+        "Last summer is still down there.",
+        "A calm surface can still argue.",
+        "It is not moody. It files.",
+        "One line. Next Short.",
+      ],
+      lines: [
         "Water keeps the heat of summers you do not remember.",
         "The deep does not refresh like a feed. It files.",
         "A current can carry last decade's warmth under this week's storm.",
@@ -223,8 +296,16 @@ function sampleShorts(channel: Channel): Short[] {
       idea: "the library that answered after closing",
       title: "The library that answered after closing",
       niche: "Story",
-      style: "ink" as ArtStyleId,
-      beats: [
+      style: "ink",
+      captions: [
+        "The library answered after close 👀",
+        "Lights out. Slip still in.",
+        "A book nobody booked.",
+        "The date stamp did not lie.",
+        "Some rooms keep promises.",
+        "One line. Next Short.",
+      ],
+      lines: [
         "The lights went out. The request slip did not.",
         "A night clerk found a book waiting on a desk nobody had booked.",
         "The title matched a question asked three hours after lockup.",
@@ -242,11 +323,11 @@ function sampleShorts(channel: Channel): Short[] {
     niche: seed.niche,
     style: seed.style,
     voice: channel.voice,
-    beats: seed.beats.map((line, beatIndex) => ({
+    beats: seed.captions.map((caption, beatIndex) => ({
       id: `sample-${index + 1}-${beatIndex}`,
-      heading: beatIndex === 0 ? "Hook" : beatIndex === seed.beats.length - 1 ? "Close" : "Beat",
-      line,
-      caption: line,
+      heading: beatIndex === 0 ? "Hook" : beatIndex === seed.captions.length - 1 ? "Close" : "Beat",
+      line: seed.lines[beatIndex] ?? caption,
+      caption,
     })),
     status: index === 2 ? "queued" : "ready",
     sample: true,

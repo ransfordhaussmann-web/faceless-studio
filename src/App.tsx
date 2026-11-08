@@ -104,6 +104,7 @@ export function App() {
             busy={busy}
             onProduce={produce}
             active={active}
+            channel={channel}
             onQueue={queueShort}
             onOpenLibrary={() => setView("library")}
           />
@@ -133,6 +134,7 @@ function CreateView({
   busy,
   onProduce,
   active,
+  channel,
   onQueue,
   onOpenLibrary,
 }: {
@@ -142,6 +144,7 @@ function CreateView({
   busy: boolean;
   onProduce: () => void;
   active: Short | null;
+  channel: Channel;
   onQueue: (id: string, when: number | null, status: Short["status"]) => void;
   onOpenLibrary: () => void;
 }) {
@@ -150,12 +153,11 @@ function CreateView({
       <header className="page-head">
         <div>
           <p className="kicker">New Short</p>
-          <h1>Type one idea. The desk writes the rest.</h1>
+          <h1>Type one idea. Get a TikTok-style Short.</h1>
         </div>
         <p className="lede">
-          Script, illustrated scenes, a narrator, and word captions — a faceless content-creator
-          workflow with no camera and no timeline. Previews use your browser voice. Sample shorts
-          are marked.
+          Teal isometric board, outlined captions, and a 9:16 TikTok frame — a faceless explainer
+          workflow with no camera. Previews use your browser voice. Sample shorts are marked.
         </p>
       </header>
 
@@ -191,7 +193,7 @@ function CreateView({
 
       {active ? (
         <div className="desk">
-          <Player short={active} />
+          <Player short={active} channel={channel} />
           <article className="script-card">
             <div className="script-head">
               <div>
