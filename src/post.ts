@@ -8,7 +8,14 @@ export type AccountStatus = {
   error?: string;
 };
 
-export type PostTarget = "tiktok" | "youtube";
+export type Accounts = {
+  tiktok: AccountStatus;
+  youtube: AccountStatus;
+  facebook: AccountStatus;
+  instagram: AccountStatus;
+};
+
+export type PostTarget = "tiktok" | "youtube" | "facebook" | "instagram";
 
 export type PostResult = {
   target: PostTarget;
@@ -16,6 +23,19 @@ export type PostResult = {
   message: string;
   mode?: string;
 };
+
+export function emptyAccounts(): Accounts {
+  return {
+    tiktok: { configured: false, connected: false },
+    youtube: { configured: false, connected: false },
+    facebook: { configured: false, connected: false },
+    instagram: { configured: false, connected: false },
+  };
+}
+
+export function anyConnected(accounts: Accounts): boolean {
+  return accounts.tiktok.connected || accounts.youtube.connected || accounts.facebook.connected || accounts.instagram.connected;
+}
 
 async function statusOf(path: string): Promise<AccountStatus> {
   try {
@@ -37,14 +57,47 @@ export function youtubeStatus(): Promise<AccountStatus> {
   return statusOf("/api/youtube/status");
 }
 
-export async function disconnectAccount(target: PostTarget): Promise<void> {
-  await fetch(`/api/${target}/disconnect`, { method: "POST", credentials: "include" });
+export async function metaStatus(): Promise<{ facebook: AccountStatus; instagram: AccountStatus }> {
+  try {
+    const response = await fetch("/api/meta/status", { credentials: "include" });
+    if (response.status === 404) {
+      const missing = { configured: false, connected: false, error: "static" };
+      return { facebook: missing, instagram: missing };
+    }
+    const data = (await response.json()) as {
+      configured?: boolean;
+      facebook?: AccountStatus;
+      instagram?: AccountStatus;
+      error?: string;
+    };
+    const fallback: AccountStatus = {
+      configured: Boolean(data.configured),
+      connected: false,
+      error: data.error,
+    };
+    return {
+      facebook: data.facebook ?? fallback,
+      instagram: data.instagram ?? fallback,
+    };
+  } catch {
+    const offline = { configured: false, connected: false, error: "offline" };
+    return { facebook: offline, instagram: offline };
+  }
 }
 
-export async function publishFile(
-  target: PostTarget,
-  short: Short,
-): Promise<PostResult> {
+export async function disconnectAccount(target: PostTarget): Promise<void> {
+  const path = target === "facebook" || target === "instagram" ? "/api/meta/disconnect" : `/api/${target}/disconnect`;
+  await fetch(path, { method: "POST", credentials: "include" });
+}
+
+function postedLabel(target: PostTarget, mode?: string): string {
+  if (target === "tiktok") return mode === "inbox" ? "Sent to your TikTok inbox" : "Posted to TikTok";
+  if (target === "youtube") return "Posted to YouTube";
+  if (target === "facebook") return mode === "reels" ? "Posted a Facebook Reel" : "Posted to Facebook";
+  return "Posted an Instagram Reel";
+}
+
+export async function publishFile(target: PostTarget, short: Short): Promise<PostResult> {
   const file = getFile(short.id);
   if (!file) return { target, ok: false, message: "Export the video first." };
   const form = new FormData();
@@ -68,24 +121,17 @@ export async function publishFile(
     if (!response.ok) {
       return { target, ok: false, message: data.error || `${target} publish failed` };
     }
-    const posted =
-      target === "tiktok"
-        ? data.mode === "inbox"
-          ? "Sent to your TikTok inbox"
-          : "Posted to TikTok"
-        : "Posted to YouTube";
-    return { target, ok: true, message: posted, mode: data.mode };
+    return { target, ok: true, message: postedLabel(target, data.mode), mode: data.mode };
   } catch (error) {
     return { target, ok: false, message: error instanceof Error ? error.message : "Publish failed" };
   }
 }
 
-export async function publishReady(
-  short: Short,
-  accounts: { tiktok: AccountStatus; youtube: AccountStatus },
-): Promise<PostResult[]> {
+export async function publishReady(short: Short, accounts: Accounts): Promise<PostResult[]> {
   const results: PostResult[] = [];
   if (accounts.tiktok.connected) results.push(await publishFile("tiktok", short));
   if (accounts.youtube.connected) results.push(await publishFile("youtube", short));
+  if (accounts.facebook.connected) results.push(await publishFile("facebook", short));
+  if (accounts.instagram.connected) results.push(await publishFile("instagram", short));
   return results;
 }

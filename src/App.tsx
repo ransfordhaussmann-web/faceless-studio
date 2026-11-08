@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Player } from "./Player";
 import { downloadFile, hasFile, hydrateFiles, shareFile } from "./files";
-import { disconnectAccount, publishReady, tiktokStatus, youtubeStatus, type AccountStatus } from "./post";
+import {
+  anyConnected,
+  disconnectAccount,
+  emptyAccounts,
+  metaStatus,
+  publishReady,
+  tiktokStatus,
+  youtubeStatus,
+  type AccountStatus,
+  type Accounts,
+  type PostTarget,
+} from "./post";
 import { exportShort } from "./produce";
 import {
   ART_STYLES,
@@ -37,10 +48,7 @@ export function App() {
   const [buildNote, setBuildNote] = useState("");
   const [activeId, setActiveId] = useState<string | null>(initial.shorts[0]?.id ?? null);
   const [filesTick, setFilesTick] = useState(0);
-  const [accounts, setAccounts] = useState<{ tiktok: AccountStatus; youtube: AccountStatus }>({
-    tiktok: { configured: false, connected: false },
-    youtube: { configured: false, connected: false },
-  });
+  const [accounts, setAccounts] = useState<Accounts>(emptyAccounts);
   const posting = useRef(new Set<string>());
   const shortsRef = useRef(shorts);
   const accountsRef = useRef(accounts);
@@ -69,6 +77,11 @@ export function App() {
     if (youtube === "connected") setBuildNote("YouTube connected. New Shorts will post automatically.");
     if (youtube === "denied") setBuildNote("YouTube login was cancelled.");
     if (youtube === "missing") setBuildNote("Add YouTube keys in Cursor Secrets, then connect again.");
+    const meta = params.get("meta");
+    if (meta === "connected") setBuildNote("Facebook connected. Reels and Page posts will go out automatically.");
+    if (meta === "denied") setBuildNote("Facebook login was cancelled.");
+    if (meta === "missing") setBuildNote("Add Facebook keys in Cursor Secrets, then connect again.");
+    if (meta === "nopage") setBuildNote("Facebook login worked, but no Page was found. Create a Page, then connect again.");
     if (params.toString()) window.history.replaceState({}, "", window.location.pathname || "./");
     void refreshAccounts();
   }, []);
@@ -107,7 +120,7 @@ export function App() {
       if (channel.auto) {
         next = { ...next, status: "queued", queuedAt: laterTonight() };
         live = await refreshAccounts();
-        if (live.tiktok.connected || live.youtube.connected) {
+        if (anyConnected(live)) {
           setBuildNote("Posting…");
           next = await applyPost(next, live);
         }
@@ -150,7 +163,7 @@ export function App() {
       if (channel.auto) {
         next = { ...next, status: "queued", queuedAt: next.queuedAt ?? laterTonight() };
         const live = await refreshAccounts();
-        if (live.tiktok.connected || live.youtube.connected) {
+        if (anyConnected(live)) {
           setBuildNote("Posting…");
           next = await applyPost(next, live);
         }
@@ -180,8 +193,8 @@ export function App() {
   }
 
   async function refreshAccounts() {
-    const [tiktok, youtube] = await Promise.all([tiktokStatus(), youtubeStatus()]);
-    const next = { tiktok, youtube };
+    const [tiktok, youtube, meta] = await Promise.all([tiktokStatus(), youtubeStatus(), metaStatus()]);
+    const next = { tiktok, youtube, facebook: meta.facebook, instagram: meta.instagram };
     setAccounts(next);
     return next;
   }
@@ -191,7 +204,7 @@ export function App() {
     if (!results.length) {
       return {
         ...short,
-        postNote: "Connect TikTok or YouTube in Channel to auto-post.",
+        postNote: "Connect TikTok, Reels, Facebook, or YouTube in Channel to auto-post.",
       };
     }
     const ok = results.filter((item) => item.ok);
@@ -208,17 +221,19 @@ export function App() {
     return { ...short, postNote: note };
   }
 
-  function liveNote(live: { tiktok: AccountStatus; youtube: AccountStatus }): string {
-    if (live.tiktok.connected || live.youtube.connected) {
-      return "Queued · will post to the connected account.";
+  function liveNote(live: Accounts): string {
+    if (anyConnected(live)) {
+      return "Queued · will post to connected accounts.";
     }
-    if (live.tiktok.error === "static" || live.youtube.error === "static") {
-      return "Queued. Auto-post needs the Cursor-hosted app with TikTok secrets — this copy can still share the file.";
+    if (
+      live.tiktok.error === "static" ||
+      live.youtube.error === "static" ||
+      live.facebook.error === "static" ||
+      live.instagram.error === "static"
+    ) {
+      return "Queued. Auto-post needs the Cursor-hosted app — this copy can still share the file.";
     }
-    if (!live.tiktok.configured && !live.youtube.configured) {
-      return "Queued. Connect TikTok in Channel after adding keys in Cursor Secrets.";
-    }
-    return "Queued tonight. Connect TikTok in Channel to post automatically.";
+    return "Queued tonight. Connect TikTok, Reels, Facebook, or YouTube in Channel to post automatically.";
   }
 
   async function postNow(id: string) {
@@ -261,7 +276,7 @@ export function App() {
         !item.postNote,
     );
     if (!due.length) return;
-    if (!live.tiktok.connected && !live.youtube.connected) return;
+    if (!anyConnected(live)) return;
     for (const short of due) {
       if (posting.current.has(short.id)) continue;
       posting.current.add(short.id);
@@ -323,7 +338,7 @@ export function App() {
             onShare={() => active && void share(active.id)}
             onDownload={() => active && downloadFile(active.id)}
             onPost={() => active && void postNow(active.id)}
-            canPost={accounts.tiktok.connected || accounts.youtube.connected}
+            canPost={anyConnected(accounts)}
           />
         )}
         {view === "library" && (
@@ -348,7 +363,7 @@ export function App() {
             onShare={(id) => void share(id)}
             onDownload={(id) => downloadFile(id)}
             onPost={(id) => void postNow(id)}
-            canPost={accounts.tiktok.connected || accounts.youtube.connected}
+            canPost={anyConnected(accounts)}
           />
         )}
         {view === "channel" && (
@@ -409,8 +424,8 @@ function CreateView({
           <h1>Type one idea. Get a TikTok-style Short.</h1>
         </div>
         <p className="lede">
-          One idea becomes a script, voice, and 9:16 video. Connect TikTok in Channel and new Shorts
-          post by themselves. Sample shorts are marked.
+          One idea becomes a script, voice, and 9:16 video. Connect TikTok, Reels, Facebook, and
+          YouTube in Channel and new Shorts post by themselves. Sample shorts are marked.
         </p>
       </header>
 
@@ -587,8 +602,8 @@ function QueueView({
           <h1>When the channel posts</h1>
         </div>
         <p className="lede">
-          When a time hits, the desk posts to any TikTok or YouTube account you connected. Keep this
-          tab open, or tap Post now.
+          When a time hits, the desk posts to any TikTok, Reels, Facebook, or YouTube account you
+          connected. Keep this tab open, or tap Post now.
         </p>
       </header>
       <ul className="queue">
@@ -640,8 +655,8 @@ function ChannelView({
 }: {
   channel: Channel;
   onChange: (channel: Channel) => void;
-  accounts: { tiktok: AccountStatus; youtube: AccountStatus };
-  onDisconnect: (target: "tiktok" | "youtube") => void;
+  accounts: Accounts;
+  onDisconnect: (target: PostTarget) => void;
 }) {
   function patch<K extends keyof Channel>(key: K, value: Channel[K]) {
     onChange({ ...channel, [key]: value });
@@ -664,7 +679,7 @@ function ChannelView({
         />
         <span>
           <strong>Auto post</strong>
-          <em>Build writes the voice, records a 9:16 video, queues it, and posts to connected TikTok and YouTube accounts.</em>
+          <em>Build writes the voice, records a 9:16 video, queues it, and posts to connected TikTok, Reels, Facebook, and YouTube accounts.</em>
         </span>
       </label>
       <div className="account-row">
@@ -673,6 +688,18 @@ function ChannelView({
           account={accounts.tiktok}
           href="/api/tiktok/start"
           onDisconnect={() => onDisconnect("tiktok")}
+        />
+        <AccountCard
+          title="Instagram Reels"
+          account={accounts.instagram}
+          href="/api/meta/start"
+          onDisconnect={() => onDisconnect("instagram")}
+        />
+        <AccountCard
+          title="Facebook"
+          account={accounts.facebook}
+          href="/api/meta/start"
+          onDisconnect={() => onDisconnect("facebook")}
         />
         <AccountCard
           title="YouTube"
@@ -757,10 +784,12 @@ function AccountCard({
         {account.connected
           ? "New Shorts post to this account when Auto post is on."
           : staticHost
-            ? "This GitHub Pages copy cannot log into TikTok. Use the Cursor-hosted app with secrets."
+            ? "This GitHub Pages copy cannot log into accounts. Use the Cursor-hosted app with secrets."
             : account.configured
               ? `Connect ${title} once. The desk then posts by itself.`
-              : `Add ${title === "TikTok" ? "TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET" : "YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET"} in Cursor Secrets, then connect.`}
+              : account.error && account.error !== "static" && account.error !== "offline"
+                ? account.error
+                : `Add keys in Cursor Secrets, then connect ${title}.`}
       </p>
       {account.connected ? (
         <button type="button" className="btn" onClick={onDisconnect}>

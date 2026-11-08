@@ -12,6 +12,12 @@ const ROUTES = new Set([
   "/api/youtube/status",
   "/api/youtube/disconnect",
   "/api/youtube/publish",
+  "/api/meta/start",
+  "/api/meta/callback",
+  "/api/meta/status",
+  "/api/meta/disconnect",
+  "/api/facebook/publish",
+  "/api/instagram/publish",
 ]);
 
 async function toWebRequest(req: IncomingMessage): Promise<Request> {
