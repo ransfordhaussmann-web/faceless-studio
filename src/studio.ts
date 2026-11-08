@@ -45,6 +45,8 @@ export type Short = {
   audioSrc?: string;
   cues?: number[];
   audioSeconds?: number;
+  fileName?: string;
+  exported?: boolean;
 };
 
 export type Channel = {
@@ -52,6 +54,7 @@ export type Channel = {
   niche: string;
   style: ArtStyleId;
   voice: VoiceId;
+  auto: boolean;
 };
 
 export type ArtStyle = {
@@ -94,13 +97,13 @@ export const PIPELINE = [
   "Script",
   "Scenes",
   "Voice",
-  "Captions",
+  "Video",
   "Ready",
 ] as const;
 
 export const EXPLAINER_SRC = `${import.meta.env.BASE_URL}voices/science-explainer.mp3`;
 
-const STORAGE_KEY = "faceless-studio-v4";
+const STORAGE_KEY = "faceless-studio-v5";
 
 type Stored = {
   channel: Channel;
@@ -112,6 +115,7 @@ export const defaultChannel = (): Channel => ({
   niche: "Science explainers",
   style: "star",
   voice: "explainer",
+  auto: true,
 });
 
 export type BoardTask = {
@@ -131,6 +135,16 @@ export type Board = {
 
 export function handleOf(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "") || "studio";
+}
+
+export function fileNameOf(short: Short, ext: string): string {
+  const slug =
+    short.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48) || "short";
+  return `${slug}.${ext}`;
 }
 
 const TONES = ["#ff4d6d", "#3dffb0", "#ffb020", "#6aa8ff", "#c084fc"];
@@ -433,7 +447,12 @@ export function loadState(): Stored {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Stored;
-      if (parsed.channel && Array.isArray(parsed.shorts)) return parsed;
+      if (parsed.channel && Array.isArray(parsed.shorts)) {
+        return {
+          channel: { ...defaultChannel(), ...parsed.channel, auto: parsed.channel.auto !== false },
+          shorts: parsed.shorts,
+        };
+      }
     }
   } catch {
     /* sample data on a fresh machine */

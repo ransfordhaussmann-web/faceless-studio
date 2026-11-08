@@ -92,6 +92,22 @@ textarea, input {
   resize: vertical;
 }
 .composer-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.build-note { margin: 8px 0 0; color: var(--accent-2); }
+.auto-line { margin: 8px 0 0; }
+.auto-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+.auto-toggle input { margin-top: 4px; width: 18px; height: 18px; }
+.auto-toggle strong { display: block; }
+.auto-toggle em { display: block; margin-top: 4px; font-style: normal; color: var(--muted); line-height: 1.45; }
 .pipe { display: flex; gap: 10px; list-style: none; padding: 0; margin: 0; flex-wrap: wrap; }
 .pipe li { color: var(--muted); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
 .pipe li[data-on="true"] { color: var(--accent-2); }
