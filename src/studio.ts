@@ -8,7 +8,7 @@ export type ArtStyleId =
   | "mosaic"
   | "brass";
 
-export type VoiceId = "rowan" | "mira" | "cassian" | "nell";
+export type VoiceId = "bella" | "luna" | "rosie" | "kiki" | "jasper" | "bruno" | "hugo" | "leo";
 
 export type ShortStatus = "draft" | "ready" | "queued" | "posted";
 
@@ -52,8 +52,6 @@ export type Voice = {
   id: VoiceId;
   name: string;
   note: string;
-  rate: number;
-  pitch: number;
 };
 
 export const ART_STYLES: ArtStyle[] = [
@@ -68,10 +66,14 @@ export const ART_STYLES: ArtStyle[] = [
 ];
 
 export const VOICES: Voice[] = [
-  { id: "rowan", name: "Rowan", note: "Low, unhurried", rate: 0.92, pitch: 0.82 },
-  { id: "mira", name: "Mira", note: "Warm, close-mic", rate: 1.02, pitch: 1.18 },
-  { id: "cassian", name: "Cassian", note: "Dry documentary", rate: 0.98, pitch: 0.9 },
-  { id: "nell", name: "Nell", note: "Hushed story", rate: 0.88, pitch: 1.08 },
+  { id: "bella", name: "Bella", note: "Yapper Mini · bright" },
+  { id: "luna", name: "Luna", note: "Yapper Mini · even" },
+  { id: "rosie", name: "Rosie", note: "Yapper Mini · warm" },
+  { id: "kiki", name: "Kiki", note: "Yapper Mini · light" },
+  { id: "jasper", name: "Jasper", note: "Yapper Mini · low" },
+  { id: "bruno", name: "Bruno", note: "Yapper Mini · solid" },
+  { id: "hugo", name: "Hugo", note: "Yapper Mini · dry" },
+  { id: "leo", name: "Leo", note: "Yapper Mini · punchy" },
 ];
 
 export const PIPELINE = [
@@ -83,7 +85,7 @@ export const PIPELINE = [
   "Ready",
 ] as const;
 
-const STORAGE_KEY = "faceless-studio-v2";
+const STORAGE_KEY = "faceless-studio-v3";
 
 type Stored = {
   channel: Channel;
@@ -94,7 +96,7 @@ export const defaultChannel = (): Channel => ({
   name: "Night Desk",
   niche: "AI workflows for agencies",
   style: "neon",
-  voice: "rowan",
+  voice: "bella",
 });
 
 export type BoardTask = {
@@ -142,8 +144,15 @@ export function styleOf(id: ArtStyleId): ArtStyle {
   return ART_STYLES.find((item) => item.id === id) ?? ART_STYLES[0];
 }
 
-export function voiceOf(id: VoiceId): Voice {
-  return VOICES.find((item) => item.id === id) ?? VOICES[0];
+export function voiceOf(id: string): Voice {
+  const legacy: Record<string, VoiceId> = {
+    rowan: "jasper",
+    mira: "bella",
+    cassian: "bruno",
+    nell: "luna",
+  };
+  const mapped = (legacy[id] ?? id) as VoiceId;
+  return VOICES.find((item) => item.id === mapped) ?? VOICES[0];
 }
 
 function uid(prefix: string): string {

@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 5173"
   },
   "dependencies": {
+    "kitten-tts-webgpu": "^0.1.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

@@ -371,7 +371,7 @@ function ChannelView({
           </button>
         ))}
       </div>
-      <h2 className="sub">Narrator</h2>
+      <h2 className="sub">Narrator — Yapper Mini</h2>
       <div className="choice-row">
         {VOICES.map((voice) => (
           <button

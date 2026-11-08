@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Channel, Short } from "./studio";
-import { boardOf, handleOf, scriptText, voiceOf } from "./studio";
+import { boardOf, handleOf, scriptText } from "./studio";
+import { playWav, yapperVoiceName, yapperWav } from "./tts";
 
 type PlayerProps = {
   short: Short;
@@ -12,69 +13,75 @@ type PlayerProps = {
 export function Player({ short, channel, autoPlay = false, onEnded }: PlayerProps) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [stage, setStage] = useState("");
   const [caption, setCaption] = useState(short.beats[0]?.caption ?? "");
   const ended = useRef(onEnded);
   ended.current = onEnded;
+  const run = useRef(0);
+  const stopClip = useRef<(() => void) | null>(null);
   const board = useMemo(() => boardOf(short, channel.name), [short, channel.name]);
   const narration = useMemo(() => short.beats.map((beat) => beat.line), [short]);
   const handle = handleOf(channel.name);
+  const yapper = yapperVoiceName(short.voice);
 
   useEffect(() => {
+    run.current += 1;
+    stopClip.current?.();
+    stopClip.current = null;
     setIndex(0);
     setCaption(short.beats[0]?.caption ?? "");
     setPlaying(false);
-    window.speechSynthesis.cancel();
+    setStage("");
   }, [short.id]);
 
   useEffect(() => {
-    if (autoPlay) play();
-    return () => window.speechSynthesis.cancel();
+    if (autoPlay) void play();
+    return () => {
+      run.current += 1;
+      stopClip.current?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [short.id, autoPlay]);
 
-  function speakFrom(start: number) {
-    window.speechSynthesis.cancel();
-    const voice = voiceOf(short.voice);
-    const voices = window.speechSynthesis.getVoices();
-    const picked =
-      voices.find((item) => item.lang.startsWith("en") && /female|woman/i.test(item.name) && short.voice !== "rowan" && short.voice !== "cassian") ||
-      voices.find((item) => item.lang.startsWith("en")) ||
-      voices[0];
-
-    let cursor = start;
-    const next = () => {
-      if (cursor >= narration.length) {
-        setPlaying(false);
-        ended.current?.();
-        return;
-      }
-      setIndex(cursor);
-      setCaption(short.beats[cursor]?.caption ?? "");
-      const utterance = new SpeechSynthesisUtterance(narration[cursor]);
-      utterance.rate = voice.rate;
-      utterance.pitch = voice.pitch;
-      if (picked) utterance.voice = picked;
-      utterance.onend = () => {
-        cursor += 1;
-        next();
-      };
-      utterance.onerror = () => {
-        cursor += 1;
-        next();
-      };
-      window.speechSynthesis.speak(utterance);
-    };
+  async function play() {
+    const token = ++run.current;
+    stopClip.current?.();
     setPlaying(true);
-    next();
-  }
-
-  function play() {
-    speakFrom(index >= short.beats.length ? 0 : index);
+    setStage("Loading Yapper Mini…");
+    const start = index >= narration.length ? 0 : index;
+    try {
+      for (let cursor = start; cursor < narration.length; cursor += 1) {
+        if (token !== run.current) return;
+        setIndex(cursor);
+        setCaption(short.beats[cursor]?.caption ?? "");
+        const blob = await yapperWav(narration[cursor], short.voice, setStage);
+        if (token !== run.current) return;
+        setStage("");
+        const clip = playWav(blob);
+        stopClip.current = clip.stop;
+        await clip.done;
+        if (token !== run.current) return;
+      }
+      setPlaying(false);
+      ended.current?.();
+    } catch (error) {
+      if (token !== run.current) return;
+      setPlaying(false);
+      const message = error instanceof Error ? error.message : "Yapper Mini failed";
+      setStage(
+        /webgpu/i.test(message)
+          ? "Yapper Mini needs Chrome, Edge, or Safari 26+ (WebGPU)"
+          : message,
+      );
+    }
   }
 
   function pause() {
-    window.speechSynthesis.cancel();
+    run.current += 1;
+    stopClip.current?.();
+    stopClip.current = null;
     setPlaying(false);
+    setStage("");
   }
 
   return (
@@ -121,7 +128,8 @@ export function Player({ short, channel, autoPlay = false, onEnded }: PlayerProp
           {playing ? "Pause" : "Play preview"}
         </button>
         <p className="muted">
-          {index + 1}/{short.beats.length} · {voiceOf(short.voice).name} · TikTok-style preview, not an upload
+          {index + 1}/{short.beats.length} · Yapper Mini · {yapper}
+          {stage ? ` · ${stage}` : ""}
         </p>
         <p className="sr-only">{scriptText(short)}</p>
       </div>
