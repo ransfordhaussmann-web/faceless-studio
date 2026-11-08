@@ -16,7 +16,7 @@ export async function GET(request: Request): Promise<Response> {
   url.searchParams.set("response_type", "code");
   url.searchParams.set(
     "scope",
-    "pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
+    "pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content,instagram_basic,instagram_manage_insights,instagram_content_publish,read_insights",
   );
   return new Response(null, {
     status: 302,

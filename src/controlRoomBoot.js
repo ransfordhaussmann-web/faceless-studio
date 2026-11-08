@@ -24,7 +24,7 @@ export function bootControlRoom() {
    ['#82a3ff','Facebook Page picked up 1.2K impressions','Just now'],
    ['#ff67c6','An Instagram Reel was saved 340 times','4m ago'],
    ['#58e8ff','Analyst flagged a stronger opening hook','8m ago'],
-   ['#ffe071','Money made this month updated from YouTube','12m ago']
+   ['#ffe071','Money made updated from all connected accounts','12m ago']
   ],
    paused:false
   };
@@ -55,10 +55,9 @@ export function bootControlRoom() {
   }
   function render(){
    const liveMoney=window.__ccrMoney;
-   const moneyValue=liveMoney&&typeof liveMoney.total==='number'
-     ? new Intl.NumberFormat('de-CH',{style:'currency',currency:liveMoney.currency||'CHF',maximumFractionDigits:0}).format(liveMoney.total)
-     : 'CHF 1’240';
-   const moneyDelta=liveMoney&&typeof liveMoney.total==='number'?'Live · last 28 days':'Demo · last 28 days';
+   const moneyFmt=new Intl.NumberFormat('de-CH',{style:'currency',currency:(liveMoney&&liveMoney.currency)||'CHF',maximumFractionDigits:0});
+   const moneyValue=liveMoney&&typeof liveMoney.total==='number' ? moneyFmt.format(liveMoney.total) : 'CHF 1’240';
+   const moneyDelta=liveMoney&&typeof liveMoney.total==='number'?'Live · all accounts':'Demo · all accounts';
    const metrics=[['Views today','190K','▲ 12.4%','#ae8aff'],['Money made',moneyValue,moneyDelta,'#ffe071'],['New followers','+547','▲ 21%','#60f5ab'],['Posts published','57','YouTube · TikTok · IG · Facebook','#53dcff']];
    $('metrics').innerHTML=metrics.map(([label,value,delta,color],i)=>'<section class="panel metric" style="--accent:'+color+'"><div class="eyebrow">'+label+'</div><strong>'+value+'</strong><em>'+delta+'</em><svg viewBox="0 0 60 22" preserveAspectRatio="none" aria-hidden="true"><path d="M1 20 '+['11 18 19 19 27 13 36 14 45 7 51 8 59 2','10 18 17 15 25 16 33 11 41 12 50 6 59 3','10 16 18 17 26 12 35 13 43 8 51 8 59 2','10 19 18 13 27 15 34 9 42 10 51 4 59 2'][i]+'" fill="none" stroke="'+color+'" stroke-width="2"/></svg></section>').join('');
    $('roster').innerHTML=agents.map(a=>'<div class="status" style="--accent:'+a.color+'"><span class="badge-icon" aria-hidden="true">'+a.icon+'</span><div style="min-width:0"><b>'+a.name+'</b><small>'+a.role+' · '+a.task+'</small></div><i class="dot" aria-hidden="true"></i></div>').join('');
@@ -194,11 +193,25 @@ export function bootControlRoom() {
     const moneyTotal=$('money-total');
     const moneyNote=$('money-note');
     const moneyBreakdown=$('money-breakdown');
-    if(moneyTotal&&snapshot.money){
-     moneyTotal.textContent=typeof snapshot.money.total==='number'?money.format(snapshot.money.total):'—';
-     if(moneyNote) moneyNote.textContent=snapshot.money.note||'';
+    const demoRows=[
+     {label:'YouTube',amount:820,note:'Demo estimated ad revenue'},
+     {label:'TikTok',amount:210,note:'Demo creator rewards'},
+     {label:'Instagram',amount:140,note:'Demo bonuses / gifts'},
+     {label:'Facebook',amount:70,note:'Demo Page ad-break earnings'}
+    ];
+    if(moneyTotal){
+     const apiRows=snapshot.money&&snapshot.money.rows?snapshot.money.rows:[];
+     const hasLiveMoney=apiRows.some(row=>typeof row.amount==='number');
+     const rows=hasLiveMoney||connected?apiRows:demoRows;
+     const liveTotal=snapshot.money&&typeof snapshot.money.total==='number'?snapshot.money.total:null;
+     moneyTotal.textContent=liveTotal!==null?money.format(liveTotal):(connected? '—': money.format(1240));
+     if(moneyNote){
+      moneyNote.textContent=hasLiveMoney||connected
+       ? (snapshot.money&&snapshot.money.note)||'Money made from all connected accounts.'
+       : 'Demo total from all four accounts. Connect them to replace this with live earnings.';
+     }
      if(moneyBreakdown){
-      moneyBreakdown.innerHTML=(snapshot.money.rows||[]).map(row=>'<div class="money-row"><div><b>'+clean(row.label)+'</b></div><strong>'+(typeof row.amount==='number'?money.format(row.amount):'—')+'</strong><small>'+clean(row.note||'')+'</small></div>').join('');
+      moneyBreakdown.innerHTML=rows.map(row=>'<div class="money-row"><div><b>'+clean(row.label)+'</b></div><strong>'+(typeof row.amount==='number'?money.format(row.amount):'—')+'</strong><small>'+clean(row.note||'')+'</small></div>').join('');
      }
     }
     if(liveBadge) liveBadge.hidden=connected===0;
