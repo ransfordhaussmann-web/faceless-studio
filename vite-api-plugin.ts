@@ -18,6 +18,11 @@ const ROUTES = new Set([
   "/api/meta/disconnect",
   "/api/facebook/publish",
   "/api/instagram/publish",
+  "/api/channel-metrics",
+  "/api/production-jobs",
+  "/api/production-publications",
+  "/api/production-voice",
+  "/api/production-voice-settings",
 ]);
 
 async function toWebRequest(req: IncomingMessage): Promise<Request> {

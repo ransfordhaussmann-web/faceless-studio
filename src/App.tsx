@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ControlRoom } from "./ControlRoom";
 import { Player } from "./Player";
 import { downloadFile, hasFile, hydrateFiles, shareFile } from "./files";
 import {
@@ -37,8 +38,20 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+type Shell = "control-room" | "studio";
+
 export function App() {
   const initial = useMemo(() => loadState(), []);
+  const [shell, setShell] = useState<Shell>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const app = params.get("app");
+    if (app === "studio") return "studio";
+    if (params.get("view") === "create" || params.get("view") === "library" || params.get("view") === "queue" || params.get("view") === "channel") {
+      return "studio";
+    }
+    if (params.get("tiktok") || params.get("youtube") || params.get("meta")) return "studio";
+    return "control-room";
+  });
   const [view, setView] = useState<ViewId>("create");
   const [channel, setChannel] = useState<Channel>(initial.channel);
   const [shorts, setShorts] = useState<Short[]>(initial.shorts);
@@ -289,6 +302,10 @@ export function App() {
     }
   }
 
+  if (shell === "control-room") {
+    return <ControlRoom onOpenStudio={() => setShell("studio")} />;
+  }
+
   return (
     <div className="app">
       <aside className="rail">
@@ -314,6 +331,9 @@ export function App() {
           ))}
         </nav>
         <div className="rail-foot">
+          <button type="button" className="nav" onClick={() => setShell("control-room")}>
+            Control room
+          </button>
           <p className="muted">{channel.name}</p>
           <p className="muted">{ART_STYLES.find((item) => item.id === channel.style)?.name}</p>
         </div>

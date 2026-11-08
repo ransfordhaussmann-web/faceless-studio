@@ -1,8 +1,8 @@
-# Faceless Studio
+# AI Content Control Room
 
-A content-creator desk for faceless Shorts in the isometric TikTok explainer style: teal agency board, desks, and huge outlined captions. Type one idea; the studio writes a six-beat script, speaks it, records a 9:16 video, and queues it to share.
+A copy of the DailyinfoRH **AI Content Control Room** desk: social channel cards, bilingual production/approval, agent demo floor, plus the Faceless Shorts studio for 9:16 video.
 
-This is a local creator tool. The default narrator is a **Science Explainer** reference clip. New Shorts speak with **Yapper Mini** Jasper, then auto-export a 9:16 video. Connect **TikTok**, **Instagram Reels**, **Facebook**, and **YouTube** in Channel (official OAuth) and Auto post will publish the file. App keys live in Cursor Secrets — never in the repo. First synthesized play downloads the Mini model (~78 MB) and needs WebGPU (Chrome, Edge, or Safari 26+).
+Open the control room first. Use **Open Shorts desk** (or `?app=studio`) for the isometric TikTok explainer pipeline. Connect **TikTok**, **Instagram Reels**, **Facebook**, and **YouTube** with official OAuth. App keys live in Cursor Secrets — never in the repo. First synthesized Short downloads the Mini model (~78 MB) and needs WebGPU (Chrome, Edge, or Safari 26+).
 
 ## Run
 
