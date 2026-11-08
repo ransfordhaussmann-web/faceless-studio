@@ -13,9 +13,13 @@ export function json(data: unknown, status = 200, extra?: HeadersInit): Response
 
 export function originOf(request: Request): string {
   const url = new URL(request.url);
+  // Never trust X-Forwarded-Host — visitors can forge redirect/callback origins.
+  const host = url.host || request.headers.get("host") || "localhost";
   const forwarded = request.headers.get("x-forwarded-proto");
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
-  const proto = forwarded || url.protocol.replace(":", "") || "http";
+  const proto =
+    forwarded === "https" || forwarded === "http"
+      ? forwarded
+      : url.protocol.replace(":", "") || "http";
   return `${proto}://${host}`;
 }
 

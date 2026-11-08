@@ -1,6 +1,10 @@
 import { json } from "./_lib/http";
-import { voiceStatus } from "./_lib/production";
 
 export async function GET(): Promise<Response> {
-  return json(voiceStatus());
+  return json({
+    configured: false,
+    setupAvailable: false,
+    region: null,
+    note: "Voice settings stay on this device. Azure keys are never stored on the server.",
+  });
 }

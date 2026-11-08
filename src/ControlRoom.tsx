@@ -83,9 +83,9 @@ export function ControlRoom({ onOpenStudio }: Props) {
           <div className="eyebrow">DailyinfoRH</div>
           <h2 id="production-title">Produktion und Freigabe</h2>
           <p className="setup-note">
-            Speichere beide Skripte als Auftrag. Für DailyinfoRH-Geschichten endet jede Folge mit einem
-            Cliffhanger. Der Produktionslauf erstellt zwei Hochkantvideos. Fertige Videos kannst du hier
-            prüfen und freigeben.
+            Speichere beide Skripte als Auftrag. Aufträge bleiben nur auf diesem Gerät — nicht auf dem
+            Server. Für DailyinfoRH-Geschichten endet jede Folge mit einem Cliffhanger. Fertige Videos
+            kannst du hier prüfen und freigeben.
           </p>
           <details>
             <summary>Neuer Produktionsauftrag</summary>
@@ -114,40 +114,14 @@ export function ControlRoom({ onOpenStudio }: Props) {
           </button>
           <p id="production-voice" className="setup-note" />
           <details id="production-voice-settings" hidden>
-            <summary>Sprecherstimmen einrichten</summary>
+            <summary>Sprecherstimmen</summary>
             <p className="setup-note">
-              Du brauchst die Region und einen Schlüssel deiner Azure-Speech-Ressource. Der Kontrollraum
-              prüft Seraphina und Ava vor dem Speichern.
+              Azure-Speech-Schlüssel werden nicht auf dem Server gespeichert. Vertonung bleibt lokal auf
+              diesem Gerät.
             </p>
-            <form id="production-voice-form" method="post" action="/api/production-voice-settings" autoComplete="off">
-              <label>
-                Azure-Region
-                <input
-                  name="region"
-                  placeholder="z. B. westeurope"
-                  maxLength={24}
-                  pattern="[a-z0-9]{3,24}"
-                  required
-                  autoCapitalize="off"
-                />
-              </label>
-              <label>
-                Azure-Speech-Schlüssel
-                <input
-                  type="password"
-                  name="key"
-                  autoComplete="off"
-                  spellCheck={false}
-                  minLength={20}
-                  maxLength={180}
-                  required
-                />
-              </label>
-              <button className="btn primary" type="submit">
-                Zugang prüfen und speichern
-              </button>
+            <form id="production-voice-form" autoComplete="off">
+              <p id="production-voice-message" className="setup-note" role="status" />
             </form>
-            <p id="production-voice-message" className="setup-note" role="status" />
           </details>
           <p id="production-status" className="setup-note" role="status" />
           <div id="production-list" className="production" />
