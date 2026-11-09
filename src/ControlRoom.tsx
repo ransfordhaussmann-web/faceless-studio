@@ -67,14 +67,14 @@ export function ControlRoom({ onOpenStudio }: Props) {
         </section>
 
         <section className="panel intro money" aria-labelledby="money-title">
-          <div className="eyebrow">Earnings</div>
+          <div className="eyebrow">All accounts</div>
           <h2 id="money-title">Money made</h2>
           <p className="money-total" id="money-total">
             —
           </p>
           <p className="setup-note" id="money-note">
-            Connect a monetized YouTube channel to load estimated ad revenue. Facebook, Instagram, and TikTok
-            payouts appear here when those networks allow it.
+            Total from YouTube, TikTok, Instagram, and Facebook. Connect each account to fill its row. YouTube
+            uses estimated ad revenue; Facebook uses Page ad-break earnings when monetization is on.
           </p>
           <div className="money-rows" id="money-breakdown" />
         </section>
@@ -83,9 +83,9 @@ export function ControlRoom({ onOpenStudio }: Props) {
           <div className="eyebrow">DailyinfoRH</div>
           <h2 id="production-title">Produktion und Freigabe</h2>
           <p className="setup-note">
-            Speichere beide Skripte als Auftrag. Für DailyinfoRH-Geschichten endet jede Folge mit einem
-            Cliffhanger. Der Produktionslauf erstellt zwei Hochkantvideos. Fertige Videos kannst du hier
-            prüfen und freigeben.
+            Speichere beide Skripte als Auftrag. Aufträge bleiben nur auf diesem Gerät — nicht auf dem
+            Server. Für DailyinfoRH-Geschichten endet jede Folge mit einem Cliffhanger. Fertige Videos
+            kannst du hier prüfen und freigeben.
           </p>
           <details>
             <summary>Neuer Produktionsauftrag</summary>
@@ -114,40 +114,14 @@ export function ControlRoom({ onOpenStudio }: Props) {
           </button>
           <p id="production-voice" className="setup-note" />
           <details id="production-voice-settings" hidden>
-            <summary>Sprecherstimmen einrichten</summary>
+            <summary>Sprecherstimmen</summary>
             <p className="setup-note">
-              Du brauchst die Region und einen Schlüssel deiner Azure-Speech-Ressource. Der Kontrollraum
-              prüft Seraphina und Ava vor dem Speichern.
+              Azure-Speech-Schlüssel werden nicht auf dem Server gespeichert. Vertonung bleibt lokal auf
+              diesem Gerät.
             </p>
-            <form id="production-voice-form" method="post" action="/api/production-voice-settings" autoComplete="off">
-              <label>
-                Azure-Region
-                <input
-                  name="region"
-                  placeholder="z. B. westeurope"
-                  maxLength={24}
-                  pattern="[a-z0-9]{3,24}"
-                  required
-                  autoCapitalize="off"
-                />
-              </label>
-              <label>
-                Azure-Speech-Schlüssel
-                <input
-                  type="password"
-                  name="key"
-                  autoComplete="off"
-                  spellCheck={false}
-                  minLength={20}
-                  maxLength={180}
-                  required
-                />
-              </label>
-              <button className="btn primary" type="submit">
-                Zugang prüfen und speichern
-              </button>
+            <form id="production-voice-form" autoComplete="off">
+              <p id="production-voice-message" className="setup-note" role="status" />
             </form>
-            <p id="production-voice-message" className="setup-note" role="status" />
           </details>
           <p id="production-status" className="setup-note" role="status" />
           <div id="production-list" className="production" />
@@ -243,9 +217,9 @@ export function ControlRoom({ onOpenStudio }: Props) {
         <section className="panel intro">
           <h3>Account access</h3>
           <p className="setup-note" id="account-access-note">
-            Tap Connect on each card and log into your real TikTok, Instagram, Facebook Page, and YouTube
-            accounts. Numbers update from those logins. This needs the Cursor-hosted app with secrets — the
-            GitHub Pages phone copy cannot store them. Open demo is only a practice floor with sample data.
+            Set this app to Private (or Team) in Publish Settings, add TikTok / YouTube / Facebook secrets
+            there, then tap Connect on each card while signed in to Cursor. Public apps cannot complete
+            account login. Open demo is only sample data.
           </p>
         </section>
       </section>

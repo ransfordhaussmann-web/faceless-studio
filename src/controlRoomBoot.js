@@ -24,7 +24,7 @@ export function bootControlRoom() {
    ['#82a3ff','Facebook Page picked up 1.2K impressions','Just now'],
    ['#ff67c6','An Instagram Reel was saved 340 times','4m ago'],
    ['#58e8ff','Analyst flagged a stronger opening hook','8m ago'],
-   ['#ffe071','Money made this month updated from YouTube','12m ago']
+   ['#ffe071','Money made updated from all connected accounts','12m ago']
   ],
    paused:false
   };
@@ -55,10 +55,9 @@ export function bootControlRoom() {
   }
   function render(){
    const liveMoney=window.__ccrMoney;
-   const moneyValue=liveMoney&&typeof liveMoney.total==='number'
-     ? new Intl.NumberFormat('de-CH',{style:'currency',currency:liveMoney.currency||'CHF',maximumFractionDigits:0}).format(liveMoney.total)
-     : 'CHF 1’240';
-   const moneyDelta=liveMoney&&typeof liveMoney.total==='number'?'Live · last 28 days':'Demo · last 28 days';
+   const moneyFmt=new Intl.NumberFormat('de-CH',{style:'currency',currency:(liveMoney&&liveMoney.currency)||'CHF',maximumFractionDigits:0});
+   const moneyValue=liveMoney&&typeof liveMoney.total==='number' ? moneyFmt.format(liveMoney.total) : 'CHF 1’240';
+   const moneyDelta=liveMoney&&typeof liveMoney.total==='number'?'Live · all accounts':'Demo · all accounts';
    const metrics=[['Views today','190K','▲ 12.4%','#ae8aff'],['Money made',moneyValue,moneyDelta,'#ffe071'],['New followers','+547','▲ 21%','#60f5ab'],['Posts published','57','YouTube · TikTok · IG · Facebook','#53dcff']];
    $('metrics').innerHTML=metrics.map(([label,value,delta,color],i)=>'<section class="panel metric" style="--accent:'+color+'"><div class="eyebrow">'+label+'</div><strong>'+value+'</strong><em>'+delta+'</em><svg viewBox="0 0 60 22" preserveAspectRatio="none" aria-hidden="true"><path d="M1 20 '+['11 18 19 19 27 13 36 14 45 7 51 8 59 2','10 18 17 15 25 16 33 11 41 12 50 6 59 3','10 16 18 17 26 12 35 13 43 8 51 8 59 2','10 19 18 13 27 15 34 9 42 10 51 4 59 2'][i]+'" fill="none" stroke="'+color+'" stroke-width="2"/></svg></section>').join('');
    $('roster').innerHTML=agents.map(a=>'<div class="status" style="--accent:'+a.color+'"><span class="badge-icon" aria-hidden="true">'+a.icon+'</span><div style="min-width:0"><b>'+a.name+'</b><small>'+a.role+' · '+a.task+'</small></div><i class="dot" aria-hidden="true"></i></div>').join('');
@@ -194,11 +193,25 @@ export function bootControlRoom() {
     const moneyTotal=$('money-total');
     const moneyNote=$('money-note');
     const moneyBreakdown=$('money-breakdown');
-    if(moneyTotal&&snapshot.money){
-     moneyTotal.textContent=typeof snapshot.money.total==='number'?money.format(snapshot.money.total):'—';
-     if(moneyNote) moneyNote.textContent=snapshot.money.note||'';
+    const demoRows=[
+     {label:'YouTube',amount:820,note:'Demo estimated ad revenue'},
+     {label:'TikTok',amount:210,note:'Demo creator rewards'},
+     {label:'Instagram',amount:140,note:'Demo bonuses / gifts'},
+     {label:'Facebook',amount:70,note:'Demo Page ad-break earnings'}
+    ];
+    if(moneyTotal){
+     const apiRows=snapshot.money&&snapshot.money.rows?snapshot.money.rows:[];
+     const hasLiveMoney=apiRows.some(row=>typeof row.amount==='number');
+     const rows=hasLiveMoney||connected?apiRows:demoRows;
+     const liveTotal=snapshot.money&&typeof snapshot.money.total==='number'?snapshot.money.total:null;
+     moneyTotal.textContent=liveTotal!==null?money.format(liveTotal):(connected? '—': money.format(1240));
+     if(moneyNote){
+      moneyNote.textContent=hasLiveMoney||connected
+       ? (snapshot.money&&snapshot.money.note)||'Money made from all connected accounts.'
+       : 'Demo total from all four accounts. Connect them to replace this with live earnings.';
+     }
      if(moneyBreakdown){
-      moneyBreakdown.innerHTML=(snapshot.money.rows||[]).map(row=>'<div class="money-row"><div><b>'+clean(row.label)+'</b></div><strong>'+(typeof row.amount==='number'?money.format(row.amount):'—')+'</strong><small>'+clean(row.note||'')+'</small></div>').join('');
+      moneyBreakdown.innerHTML=rows.map(row=>'<div class="money-row"><div><b>'+clean(row.label)+'</b></div><strong>'+(typeof row.amount==='number'?money.format(row.amount):'—')+'</strong><small>'+clean(row.note||'')+'</small></div>').join('');
      }
     }
     if(liveBadge) liveBadge.hidden=connected===0;
@@ -230,15 +243,76 @@ export function bootControlRoom() {
   const productionList = $('production-list');
   const productionForm = $('production-form');
   let productionId;
+  const PRODUCTION_KEY = 'faceless-production-v1';
+  const PRODUCTION_MAX = 40;
 
-  async function productionRequest(input) {
-   const options = input ? {
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(input)
-   } : {cache:'no-store'};
-   const response = await fetch('/api/production-jobs', options);
-   const data = await response.json();
-   if (!response.ok) throw new Error(data.error || 'Auftrag konnte nicht geladen werden.');
-   return data;
+  function loadProductionStore() {
+   try {
+    const saved = JSON.parse(localStorage.getItem(PRODUCTION_KEY) || 'null');
+    if (saved && Array.isArray(saved.jobs) && Array.isArray(saved.publications)) return saved;
+   } catch {}
+   return { jobs: [], publications: [] };
+  }
+  function saveProductionStore(next) {
+   localStorage.setItem(PRODUCTION_KEY, JSON.stringify({
+    jobs: next.jobs.slice(0, PRODUCTION_MAX),
+    publications: next.publications.slice(0, PRODUCTION_MAX * 2),
+   }));
+  }
+  function productionRequest(input) {
+   const store = loadProductionStore();
+   if (!input) return { jobs: store.jobs, publications: store.publications };
+   const action = input.action;
+   const id = String(input.id || '');
+   if (!action || !id) throw new Error('action und id sind nötig.');
+   let existing = store.jobs.find((job) => job.id === id);
+   if (action === 'create') {
+    if (store.jobs.length >= PRODUCTION_MAX) throw new Error('Zu viele Aufträge auf diesem Gerät. Lösche ältere zuerst.');
+    const title = String(input.title || '').trim();
+    const script_de = String(input.scriptDe || '').trim();
+    const script_en = String(input.scriptEn || '').trim();
+    if (!title || !script_de || !script_en) throw new Error('Titel und beide Skripte sind nötig.');
+    if (existing) throw new Error('Auftrag existiert bereits. Lade die Seite neu.');
+    existing = {
+     id, title, script_de, script_en, video_de: '', video_en: '',
+     approved_at: null, render_error: null, render_lease_until: null, revision: 1,
+     created_at: new Date().toISOString(),
+    };
+    store.jobs.unshift(existing);
+   } else {
+    if (!existing) throw new Error('Auftrag nicht gefunden.');
+    if (input.revision !== undefined && Number(input.revision) !== existing.revision) {
+     throw new Error('Auftrag wurde inzwischen geändert. Bitte aktualisieren.');
+    }
+    if (action === 'attach') {
+     const video_de = String(input.videoDe || '').trim();
+     const video_en = String(input.videoEn || '').trim();
+     if (!video_de || !video_en) throw new Error('Beide Videolinks sind nötig.');
+     existing.video_de = video_de;
+     existing.video_en = video_en;
+     existing.render_error = null;
+     existing.revision += 1;
+    } else if (action === 'retry') {
+     existing.render_error = null;
+     existing.render_lease_until = null;
+     existing.revision += 1;
+    } else if (action === 'approve' || action === 'approve_publish') {
+     if (!existing.video_de || !existing.video_en) throw new Error('Beide Videos müssen vorhanden sein.');
+     existing.approved_at = new Date().toISOString();
+     existing.revision += 1;
+     if (action === 'approve_publish') {
+      for (const language of ['de', 'en']) {
+       if (!store.publications.some((item) => item.job_id === existing.id && item.language === language)) {
+        store.publications.push({ job_id: existing.id, language, state: 'queued' });
+       }
+      }
+     }
+    } else {
+     throw new Error('Unbekannte Aktion.');
+    }
+   }
+   saveProductionStore(store);
+   return { job: existing, jobs: store.jobs, publications: store.publications };
   }
 
   function element(tag, content, className) {
@@ -248,14 +322,10 @@ export function bootControlRoom() {
    return node;
   }
 
-  async function refreshProduction() {
-   const [{jobs}, publicationsResponse] = await Promise.all([
-    productionRequest(), fetch('/api/production-publications',{cache:'no-store'})
-   ]);
-   if (!publicationsResponse.ok) throw new Error('Veröffentlichungsstatus konnte nicht geladen werden.');
-   const {publications} = await publicationsResponse.json();
+  function refreshProduction() {
+   const { jobs, publications } = productionRequest();
    productionList.replaceChildren();
-   if (!jobs.length) productionList.append(element('p','Noch keine Produktionsaufträge.','setup-note'));
+   if (!jobs.length) productionList.append(element('p','Noch keine Produktionsaufträge. Aufträge bleiben nur auf diesem Gerät.','setup-note'));
    for (const job of jobs) {
     const article = element('article',null,'panel production-job');
     const story = job.title.startsWith('DailyinfoRH Story ');
@@ -316,29 +386,27 @@ export function bootControlRoom() {
     if (job.video_de && job.video_en && !job.approved_at) {
      const approve = element('button',story?'Freigeben und auf vier Kanälen einplanen':'Intern freigeben','btn primary');
      if (story) article.append(element('p','Deutsch und Englisch für Facebook, Instagram, TikTok und YouTube.','setup-note'));
-     approve.addEventListener('click',() => changeProduction(approve,{action:story?'approve_publish':'approve',id:job.id,revision:job.revision},story?'Beide Fassungen warten auf die Übergabe an Metricool.':'Auftrag intern freigegeben.'));
+     approve.addEventListener('click',() => changeProduction(approve,{action:story?'approve_publish':'approve',id:job.id,revision:job.revision},story?'Beide Fassungen lokal freigegeben (dieses Gerät).':'Auftrag intern freigegeben.'));
      article.append(approve);
     }
     for (const post of publication) {
-     const messages={queued:'Wartet auf Metricool',submitting:'Übergabe läuft oder wird geprüft',scheduled:'In Metricool eingeplant',failed:'Übergabe fehlgeschlagen'};
+     const messages={queued:'Lokal vorgemerkt',submitting:'Übergabe läuft oder wird geprüft',scheduled:'Eingeplant',failed:'Übergabe fehlgeschlagen'};
      const label=post.language.toUpperCase()+' · '+messages[post.state];
      article.append(element('p',label+(post.error?' · '+post.error:''),'setup-note'));
     }
     if (job.approved_at) {
-     const planner = element('a','Metricool-Planer öffnen');
-     planner.href = 'https://app.metricool.com/planner/history?blogId=7959996&userId=6244133';
-     article.append(planner);
+     article.append(element('p','Freigabe liegt auf diesem Gerät.','setup-note'));
     }
     productionList.append(article);
    }
   }
 
-  async function changeProduction(button,input,message,onSaved) {
+  function changeProduction(button,input,message,onSaved) {
    button.disabled = true;
    try {
-    await productionRequest(input);
+    productionRequest(input);
     onSaved?.();
-    await refreshProduction();
+    refreshProduction();
     productionStatus.textContent = message;
    } catch(error) {
     productionStatus.textContent = error.message;
@@ -352,7 +420,7 @@ export function bootControlRoom() {
    productionId ??= crypto.randomUUID();
    changeProduction(productionForm.querySelector('button'),{
     ...Object.fromEntries(new FormData(productionForm)),action:'create',id:productionId
-   },'Auftrag gespeichert.',() => {
+   },'Auftrag gespeichert (nur dieses Gerät).',() => {
     productionForm.reset();
     productionId = undefined;
    });
@@ -360,48 +428,25 @@ export function bootControlRoom() {
   productionForm.addEventListener('submit', onProductionSubmit);
   cleanups.push(() => productionForm.removeEventListener('submit', onProductionSubmit));
   function reloadProduction() {
-   return refreshProduction().catch(() => { productionStatus.textContent = 'Aufträge konnten nicht geladen werden. Lade die Seite erneut.'; });
+   try {
+    refreshProduction();
+   } catch {
+    productionStatus.textContent = 'Aufträge konnten nicht geladen werden. Lade die Seite erneut.';
+   }
   }
   const refreshBtn = $('production-refresh');
   refreshBtn.addEventListener('click',reloadProduction);
   cleanups.push(() => refreshBtn.removeEventListener('click', reloadProduction));
   reloadProduction();
-  async function loadVoiceStatus() {
-   try {
-    const response = await fetch('/api/production-voice',{cache:'no-store'});
-    if (!response.ok) throw new Error('Voice status unavailable');
-    const {configured,setupAvailable} = await response.json();
-    $('production-voice-settings').hidden = !setupAvailable;
-    $('production-voice').textContent = configured
-     ? 'Vertonung für neue Aufträge: Seraphina (DE) und Ava (EN).'
-     : 'Automatische Vertonung über Microsoft Edge: Seraphina (DE), Ava (EN). Bei einem Sprachfehler stoppt die Produktion.';
-   } catch {
-    $('production-voice').textContent = 'Status der Vertonung konnte nicht geladen werden.';
-   }
+  function loadVoiceStatus() {
+   $('production-voice-settings').hidden = true;
+   $('production-voice').textContent =
+    'Vertonung bleibt lokal: Seraphina (DE) und Ava (EN). Azure-Schlüssel werden nicht auf dem Server gespeichert.';
   }
-  const onVoiceSubmit = async (event) => {
+  const onVoiceSubmit = (event) => {
    event.preventDefault();
-   const form = event.currentTarget;
-   const button = form.querySelector('button');
-   const message = $('production-voice-message');
-   button.disabled = true;
-   message.textContent = 'Azure-Zugang wird geprüft …';
-   try {
-    const response = await fetch('/api/production-voice-settings',{
-     method:'POST', headers:{'Content-Type':'application/json'},
-     body:JSON.stringify(Object.fromEntries(new FormData(form)))
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Der Zugang konnte nicht gespeichert werden.');
-    message.textContent = 'Beide Stimmen sind verfügbar. Der Zugang wurde gespeichert.';
-    form.reset();
-    await loadVoiceStatus();
-   } catch(error) {
-    message.textContent = error.message;
-   } finally {
-    form.elements.key.value = '';
-    button.disabled = false;
-   }
+   $('production-voice-message').textContent =
+    'Azure-Schlüssel werden nicht auf dem Server angenommen. Vertonung bleibt lokal.';
   };
   const voiceForm = $('production-voice-form');
   voiceForm.addEventListener('submit', onVoiceSubmit);

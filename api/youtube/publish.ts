@@ -1,12 +1,14 @@
-import { json, sameOrigin } from "../_lib/http";
+import { guardSensitive } from "../_lib/auth";
+import { json } from "../_lib/http";
 import { readYouTube, refreshYouTube, youtubeConfigured, youtubeCookie, youtubeMissing } from "../_lib/youtube";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
 export async function POST(request: Request): Promise<Response> {
-  if (!sameOrigin(request)) return json({ error: "bad origin" }, 403);
+  const gate = await guardSensitive(request, { rateKey: "publish", limit: 6, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!youtubeConfigured()) return youtubeMissing();
-  const session = readYouTube(request);
+  const session = readYouTube(request, gate.sub);
   if (!session) return json({ error: "Connect YouTube in Channel first." }, 401);
   let fresh;
   try {
@@ -62,6 +64,6 @@ export async function POST(request: Request): Promise<Response> {
   return json(
     { ok: true, videoId: uploaded.id ?? null, name: fresh.name },
     200,
-    { "set-cookie": youtubeCookie(fresh, request) },
+    { "set-cookie": youtubeCookie({ ...fresh, owner: gate.sub }, request) },
   );
 }

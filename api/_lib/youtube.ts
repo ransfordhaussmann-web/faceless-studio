@@ -1,9 +1,10 @@
 import { json, originOf, readCookie, setCookie } from "./http";
+import { forViewer, type Owned } from "./owned";
 
 export const YT_COOKIE = "fs_youtube";
 export const YT_STATE = "fs_youtube_state";
 
-export type YouTubeSession = {
+export type YouTubeSession = Owned & {
   access: string;
   refresh: string;
   expires: number;
@@ -14,19 +15,20 @@ export function youtubeConfigured(): boolean {
   return Boolean(process.env.YOUTUBE_CLIENT_ID?.trim() && process.env.YOUTUBE_CLIENT_SECRET?.trim());
 }
 
-export function readYouTube(request: Request): YouTubeSession | null {
+export function readYouTube(request: Request, viewerSub: string): YouTubeSession | null {
   const raw = readCookie(request, YT_COOKIE);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as YouTubeSession;
     if (!parsed.access || !parsed.refresh) return null;
-    return parsed;
+    return forViewer(parsed, viewerSub);
   } catch {
     return null;
   }
 }
 
 export function youtubeCookie(session: YouTubeSession, request: Request): string {
+  if (!session.owner) throw new Error("YouTube session missing owner");
   return setCookie(YT_COOKIE, JSON.stringify(session), request);
 }
 
@@ -55,6 +57,7 @@ export async function refreshYouTube(request: Request, session: YouTubeSession):
   if (!data.access_token) throw new Error(data.error || "YouTube session expired");
   return {
     ...session,
+    owner: session.owner,
     access: data.access_token,
     expires: Date.now() + (data.expires_in ?? 3600) * 1000,
   };

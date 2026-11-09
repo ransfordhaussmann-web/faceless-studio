@@ -1,10 +1,15 @@
-import { json, originOf, randomState, setCookie } from "../_lib/http";
+import { clientError, guardSensitive } from "../_lib/auth";
+import { originOf, randomState } from "../_lib/http";
+import { writeOauthState } from "../_lib/owned";
 import { TT_STATE, tiktokConfigured } from "../_lib/tiktok";
 
 export async function GET(request: Request): Promise<Response> {
+  const gate = await guardSensitive(request, { rateKey: "oauth-start", limit: 10, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!tiktokConfigured()) {
-    return json(
-      { error: "Add TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET in Cursor Secrets, then connect again." },
+    return clientError(
+      request,
+      "Add TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET in Cursor Secrets (Publish Settings), then connect again.",
       501,
     );
   }
@@ -19,7 +24,7 @@ export async function GET(request: Request): Promise<Response> {
     status: 302,
     headers: {
       location: url.toString(),
-      "set-cookie": setCookie(TT_STATE, state, request, 600),
+      "set-cookie": writeOauthState(TT_STATE, state, gate.sub, request),
       "cache-control": "private, no-store",
     },
   });

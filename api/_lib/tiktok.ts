@@ -1,9 +1,10 @@
 import { json, originOf, readCookie, setCookie } from "./http";
+import { forViewer, type Owned } from "./owned";
 
 export const TT_COOKIE = "fs_tiktok";
 export const TT_STATE = "fs_tiktok_state";
 
-type TikTokSession = {
+export type TikTokSession = Owned & {
   access: string;
   refresh: string;
   openId: string;
@@ -15,19 +16,20 @@ export function tiktokConfigured(): boolean {
   return Boolean(process.env.TIKTOK_CLIENT_KEY?.trim() && process.env.TIKTOK_CLIENT_SECRET?.trim());
 }
 
-export function readSession(request: Request): TikTokSession | null {
+export function readSession(request: Request, viewerSub: string): TikTokSession | null {
   const raw = readCookie(request, TT_COOKIE);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as TikTokSession;
     if (!parsed.access || !parsed.refresh) return null;
-    return parsed;
+    return forViewer(parsed, viewerSub);
   } catch {
     return null;
   }
 }
 
 export function sessionCookie(session: TikTokSession, request: Request): string {
+  if (!session.owner) throw new Error("TikTok session missing owner");
   return setCookie(TT_COOKIE, JSON.stringify(session), request);
 }
 
@@ -56,6 +58,7 @@ export async function refreshSession(request: Request, session: TikTokSession): 
     throw new Error(data.error_description || data.error || "TikTok session expired");
   }
   return {
+    owner: session.owner,
     access: data.access_token,
     refresh: data.refresh_token || session.refresh,
     openId: data.open_id || session.openId,

@@ -1,5 +1,7 @@
-import { originOf, readCookie } from "../_lib/http";
+import { requireSignedIn } from "../_lib/auth";
+import { originOf } from "../_lib/http";
 import { graphGet, META_STATE, metaConfigured, metaCookie, metaRedirect } from "../_lib/meta";
+import { readOauthState } from "../_lib/owned";
 
 type Token = { access_token?: string; expires_in?: number };
 type Page = {
@@ -12,11 +14,13 @@ type Pages = { data?: Page[] };
 
 export async function GET(request: Request): Promise<Response> {
   const home = `${originOf(request)}/?live=1`;
+  const who = await requireSignedIn(request);
+  if (who instanceof Response) return Response.redirect(`${home}&meta=signin`, 302);
   if (!metaConfigured()) return Response.redirect(`${home}&meta=missing`, 302);
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const expected = readCookie(request, META_STATE);
+  const expected = readOauthState(request, META_STATE, who.sub);
   if (!code || !state || !expected || state !== expected) {
     return Response.redirect(`${home}&meta=denied`, 302);
   }
@@ -52,6 +56,7 @@ export async function GET(request: Request): Promise<Response> {
       location: `${home}&meta=connected`,
       "set-cookie": metaCookie(
         {
+          owner: who.sub,
           user,
           expires,
           pageId: page.id,

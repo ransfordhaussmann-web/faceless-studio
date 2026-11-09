@@ -1,10 +1,15 @@
-import { json, randomState, setCookie } from "../_lib/http";
+import { clientError, guardSensitive } from "../_lib/auth";
+import { randomState } from "../_lib/http";
+import { writeOauthState } from "../_lib/owned";
 import { META_STATE, metaConfigured, metaRedirect } from "../_lib/meta";
 
 export async function GET(request: Request): Promise<Response> {
+  const gate = await guardSensitive(request, { rateKey: "oauth-start", limit: 10, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!metaConfigured()) {
-    return json(
-      { error: "Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in Cursor Secrets, then connect again." },
+    return clientError(
+      request,
+      "Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in Cursor Secrets (Publish Settings), then connect again.",
       501,
     );
   }
@@ -16,13 +21,13 @@ export async function GET(request: Request): Promise<Response> {
   url.searchParams.set("response_type", "code");
   url.searchParams.set(
     "scope",
-    "pages_show_list,pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
+    "pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content,instagram_basic,instagram_manage_insights,instagram_content_publish,read_insights",
   );
   return new Response(null, {
     status: 302,
     headers: {
       location: url.toString(),
-      "set-cookie": setCookie(META_STATE, state, request, 600),
+      "set-cookie": writeOauthState(META_STATE, state, gate.sub, request),
       "cache-control": "private, no-store",
     },
   });

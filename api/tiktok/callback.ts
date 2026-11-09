@@ -1,15 +1,19 @@
-import { originOf, readCookie } from "../_lib/http";
+import { requireSignedIn } from "../_lib/auth";
+import { json, originOf } from "../_lib/http";
+import { readOauthState } from "../_lib/owned";
 import { displayName, redirectUri, sessionCookie, TT_STATE, tiktokConfigured } from "../_lib/tiktok";
 
 export async function GET(request: Request): Promise<Response> {
   const home = `${originOf(request)}/?live=1`;
+  const who = await requireSignedIn(request);
+  if (who instanceof Response) return Response.redirect(`${home}&tiktok=signin`, 302);
   if (!tiktokConfigured()) {
     return Response.redirect(`${home}&tiktok=missing`, 302);
   }
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const expected = readCookie(request, TT_STATE);
+  const expected = readOauthState(request, TT_STATE, who.sub);
   if (!code || !state || !expected || state !== expected) {
     return Response.redirect(`${home}&tiktok=denied`, 302);
   }
@@ -43,6 +47,7 @@ export async function GET(request: Request): Promise<Response> {
   }
   const cookie = sessionCookie(
     {
+      owner: who.sub,
       access: token.access_token,
       refresh: token.refresh_token,
       openId: token.open_id ?? "",
