@@ -217,9 +217,9 @@ export function ControlRoom({ onOpenStudio }: Props) {
         <section className="panel intro">
           <h3>Account access</h3>
           <p className="setup-note" id="account-access-note">
-            Tap Connect on each card and log into your real TikTok, Instagram, Facebook Page, and YouTube
-            accounts. Numbers update from those logins. This needs the Cursor-hosted app with secrets — the
-            GitHub Pages phone copy cannot store them. Open demo is only a practice floor with sample data.
+            Set this app to Private (or Team) in Publish Settings, add TikTok / YouTube / Facebook secrets
+            there, then tap Connect on each card while signed in to Cursor. Public apps cannot complete
+            account login. Open demo is only sample data.
           </p>
         </section>
       </section>

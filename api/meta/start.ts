@@ -1,5 +1,5 @@
-import { guardSensitive } from "../_lib/auth";
-import { json, randomState } from "../_lib/http";
+import { clientError, guardSensitive } from "../_lib/auth";
+import { randomState } from "../_lib/http";
 import { writeOauthState } from "../_lib/owned";
 import { META_STATE, metaConfigured, metaRedirect } from "../_lib/meta";
 
@@ -7,8 +7,9 @@ export async function GET(request: Request): Promise<Response> {
   const gate = await guardSensitive(request, { rateKey: "oauth-start", limit: 10, windowMs: 60_000 });
   if (gate instanceof Response) return gate;
   if (!metaConfigured()) {
-    return json(
-      { error: "Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in Cursor Secrets, then connect again." },
+    return clientError(
+      request,
+      "Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in Cursor Secrets (Publish Settings), then connect again.",
       501,
     );
   }

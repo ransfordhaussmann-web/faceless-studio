@@ -1,24 +1,42 @@
-import { requireIdentity, type VerifiedIdentity } from "../../cursor/identity";
+import { requireIdentity, type VerifiedIdentity } from "../../cursor/identity.js";
 import { json, sameOrigin } from "./http";
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
-/** Signed-in Cursor person only (not API keys). Locally uses the simulated viewer. */
-export async function requireSignedIn(request: Request): Promise<VerifiedIdentity | Response> {
-  const identity = await requireIdentity(request);
-  if (identity instanceof Response) {
-    return json(
+const SIGN_IN_MESSAGE =
+  "Sign in required. In Publish Settings, set this app to Private (or Team), then open it while signed in to Cursor. Add TikTok / YouTube / Facebook secrets there too.";
+
+/** Prefer a readable page when the browser navigates (Connect links). */
+export function clientError(request: Request, message: string, status: number): Response {
+  const accept = request.headers.get("accept") || "";
+  if (accept.includes("text/html")) {
+    const safe = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return new Response(
+      `<!doctype html><html lang="en"><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Account connect</title><body style="font-family:system-ui,sans-serif;max-width:36rem;margin:3rem auto;padding:0 1rem;line-height:1.5"><h1>Can’t connect yet</h1><p>${safe}</p><p><a href="/">Back to Control Room</a></p></body></html>`,
       {
-        error:
-          "Sign in required. Publish this app as private or team, then open it while signed in to Cursor.",
+        status,
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" },
       },
-      401,
     );
   }
-  if (identity.kind !== "person") {
-    return json({ error: "A signed-in person is required for this action." }, 403);
+  return json({ error: message }, status);
+}
+
+/** Signed-in Cursor person only (not API keys). Locally uses the simulated viewer. */
+export async function requireSignedIn(request: Request): Promise<VerifiedIdentity | Response> {
+  try {
+    const identity = await requireIdentity(request);
+    if (identity instanceof Response) {
+      return clientError(request, SIGN_IN_MESSAGE, 401);
+    }
+    if (identity.kind !== "person") {
+      return clientError(request, "A signed-in person is required for this action.", 403);
+    }
+    return identity;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "identity check failed";
+    return clientError(request, `Could not verify sign-in (${detail}).`, 500);
   }
-  return identity;
 }
 
 /** Block cross-site state-changing calls (CSRF). */
@@ -59,7 +77,7 @@ export async function guardSensitive(
       opts.limit ?? 30,
       opts.windowMs ?? 60_000,
     );
-    if (!ok) return json({ error: "Too many requests. Try again shortly." }, 429);
+    if (!ok) return clientError(request, "Too many requests. Try again shortly.", 429);
   }
   return identity;
 }
