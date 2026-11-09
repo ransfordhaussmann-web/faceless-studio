@@ -17,7 +17,7 @@ export async function POST(request: Request): Promise<Response> {
       501,
     );
   }
-  const session = readMeta(request);
+  const session = readMeta(request, gate.sub);
   if (!session) return json({ error: "Connect Facebook in Channel first." }, 401);
 
   const form = await request.formData();

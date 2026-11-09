@@ -1,5 +1,6 @@
 import { guardSensitive } from "../_lib/auth";
-import { json, randomState, setCookie } from "../_lib/http";
+import { json, randomState } from "../_lib/http";
+import { writeOauthState } from "../_lib/owned";
 import { META_STATE, metaConfigured, metaRedirect } from "../_lib/meta";
 
 export async function GET(request: Request): Promise<Response> {
@@ -25,7 +26,7 @@ export async function GET(request: Request): Promise<Response> {
     status: 302,
     headers: {
       location: url.toString(),
-      "set-cookie": setCookie(META_STATE, state, request, 600),
+      "set-cookie": writeOauthState(META_STATE, state, gate.sub, request),
       "cache-control": "private, no-store",
     },
   });

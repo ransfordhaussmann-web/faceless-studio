@@ -1,5 +1,6 @@
 import { requireSignedIn } from "../_lib/auth";
-import { json, originOf, readCookie } from "../_lib/http";
+import { json, originOf } from "../_lib/http";
+import { readOauthState } from "../_lib/owned";
 import { displayName, redirectUri, sessionCookie, TT_STATE, tiktokConfigured } from "../_lib/tiktok";
 
 export async function GET(request: Request): Promise<Response> {
@@ -12,7 +13,7 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const expected = readCookie(request, TT_STATE);
+  const expected = readOauthState(request, TT_STATE, who.sub);
   if (!code || !state || !expected || state !== expected) {
     return Response.redirect(`${home}&tiktok=denied`, 302);
   }
@@ -46,6 +47,7 @@ export async function GET(request: Request): Promise<Response> {
   }
   const cookie = sessionCookie(
     {
+      owner: who.sub,
       access: token.access_token,
       refresh: token.refresh_token,
       openId: token.open_id ?? "",

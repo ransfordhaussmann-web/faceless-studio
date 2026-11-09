@@ -1,10 +1,11 @@
 import { json, originOf, readCookie, setCookie } from "./http";
+import { forViewer, type Owned } from "./owned";
 
 export const GRAPH = "v21.0";
 export const META_COOKIE = "fs_meta";
 export const META_STATE = "fs_meta_state";
 
-export type MetaSession = {
+export type MetaSession = Owned & {
   user: string;
   expires: number;
   pageId: string;
@@ -18,19 +19,20 @@ export function metaConfigured(): boolean {
   return Boolean(process.env.FACEBOOK_APP_ID?.trim() && process.env.FACEBOOK_APP_SECRET?.trim());
 }
 
-export function readMeta(request: Request): MetaSession | null {
+export function readMeta(request: Request, viewerSub: string): MetaSession | null {
   const raw = readCookie(request, META_COOKIE);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as MetaSession;
     if (!parsed.pageToken || !parsed.pageId) return null;
-    return parsed;
+    return forViewer(parsed, viewerSub);
   } catch {
     return null;
   }
 }
 
 export function metaCookie(session: MetaSession, request: Request): string {
+  if (!session.owner) throw new Error("Meta session missing owner");
   return setCookie(META_COOKIE, JSON.stringify(session), request);
 }
 

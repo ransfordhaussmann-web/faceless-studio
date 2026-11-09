@@ -36,7 +36,7 @@ export async function POST(request: Request): Promise<Response> {
   const gate = await guardSensitive(request, { rateKey: "publish", limit: 6, windowMs: 60_000 });
   if (gate instanceof Response) return gate;
   if (!tiktokConfigured()) return missingConfig();
-  const session = readSession(request);
+  const session = readSession(request, gate.sub);
   if (!session) return json({ error: "Connect TikTok in Channel first." }, 401);
 
   let fresh;
@@ -100,7 +100,7 @@ export async function POST(request: Request): Promise<Response> {
             "TikTok did not accept the upload. The developer app needs video.publish (or video.upload) approved.",
         },
         400,
-        { "set-cookie": sessionCookie(fresh, request) },
+        { "set-cookie": sessionCookie({ ...fresh, owner: gate.sub }, request) },
       );
     }
   }
@@ -129,6 +129,6 @@ export async function POST(request: Request): Promise<Response> {
       name: fresh.name,
     },
     200,
-    { "set-cookie": sessionCookie(fresh, request) },
+    { "set-cookie": sessionCookie({ ...fresh, owner: gate.sub }, request) },
   );
 }

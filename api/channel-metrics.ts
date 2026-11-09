@@ -104,6 +104,7 @@ async function youtubeRevenue(access: string, from: string, to: string): Promise
 
 async function youtubeLive(
   request: Request,
+  viewerSub: string,
   from: string,
   to: string,
 ): Promise<{ channel: ChannelMetrics; cookie?: string; moneyNote: string }> {
@@ -118,7 +119,7 @@ async function youtubeLive(
       moneyNote: "Connect YouTube to load ad revenue.",
     };
   }
-  const session = readYouTube(request);
+  const session = readYouTube(request, viewerSub);
   if (!session) return { channel: empty(true, href), moneyNote: "Connect YouTube to load ad revenue." };
   try {
     const fresh = await refreshYouTube(request, session);
@@ -147,7 +148,7 @@ async function youtubeLive(
         currency: "CHF",
         href,
       },
-      cookie: youtubeCookie({ ...fresh, name }, request),
+      cookie: youtubeCookie({ ...fresh, name, owner: viewerSub }, request),
       moneyNote: money.note,
     };
   } catch (error) {
@@ -158,7 +159,10 @@ async function youtubeLive(
   }
 }
 
-async function tiktokLive(request: Request): Promise<{ channel: ChannelMetrics; cookie?: string }> {
+async function tiktokLive(
+  request: Request,
+  viewerSub: string,
+): Promise<{ channel: ChannelMetrics; cookie?: string }> {
   const href = "/api/tiktok/start";
   if (!tiktokConfigured()) {
     return {
@@ -169,7 +173,7 @@ async function tiktokLive(request: Request): Promise<{ channel: ChannelMetrics; 
       ),
     };
   }
-  const session = readSession(request);
+  const session = readSession(request, viewerSub);
   if (!session) return { channel: empty(true, href) };
   try {
     const fresh = await refreshSession(request, session);
@@ -203,7 +207,7 @@ async function tiktokLive(request: Request): Promise<{ channel: ChannelMetrics; 
         href,
         error: data.error?.message,
       },
-      cookie: sessionCookie({ ...fresh, name }, request),
+      cookie: sessionCookie({ ...fresh, name, owner: viewerSub }, request),
     };
   } catch (error) {
     return {
@@ -307,6 +311,7 @@ async function facebookEarnings(
 
 async function metaLive(
   request: Request,
+  viewerSub: string,
   from: string,
   to: string,
 ): Promise<{ facebook: ChannelMetrics; instagram: ChannelMetrics; facebookMoneyNote: string; instagramMoneyNote: string }> {
@@ -324,7 +329,7 @@ async function metaLive(
       instagramMoneyNote: "Connect Instagram via Facebook first.",
     };
   }
-  const session = readMeta(request);
+  const session = readMeta(request, viewerSub);
   if (!session) {
     return {
       facebook: empty(true, href),
@@ -441,9 +446,9 @@ export async function GET(request: Request): Promise<Response> {
   if (gate instanceof Response) return gate;
   const period = periodRange();
   const [youtube, tiktok, meta] = await Promise.all([
-    youtubeLive(request, period.from, period.to),
-    tiktokLive(request),
-    metaLive(request, period.from, period.to),
+    youtubeLive(request, gate.sub, period.from, period.to),
+    tiktokLive(request, gate.sub),
+    metaLive(request, gate.sub, period.from, period.to),
   ]);
   const channels = {
     youtube: youtube.channel,

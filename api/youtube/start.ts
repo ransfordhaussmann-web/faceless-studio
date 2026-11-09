@@ -1,5 +1,6 @@
 import { guardSensitive } from "../_lib/auth";
-import { json, randomState, setCookie } from "../_lib/http";
+import { json, randomState } from "../_lib/http";
+import { writeOauthState } from "../_lib/owned";
 import { YT_STATE, youtubeConfigured, youtubeRedirect } from "../_lib/youtube";
 
 export async function GET(request: Request): Promise<Response> {
@@ -32,7 +33,7 @@ export async function GET(request: Request): Promise<Response> {
     status: 302,
     headers: {
       location: url.toString(),
-      "set-cookie": setCookie(YT_STATE, state, request, 600),
+      "set-cookie": writeOauthState(YT_STATE, state, gate.sub, request),
       "cache-control": "private, no-store",
     },
   });

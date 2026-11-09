@@ -28,7 +28,7 @@ export async function POST(request: Request): Promise<Response> {
       501,
     );
   }
-  const session = readMeta(request);
+  const session = readMeta(request, gate.sub);
   if (!session?.igId) {
     return json({ error: "Link a professional Instagram account to your Facebook Page, then connect again." }, 401);
   }

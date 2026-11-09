@@ -1,5 +1,6 @@
 import { requireSignedIn } from "../_lib/auth";
-import { originOf, readCookie } from "../_lib/http";
+import { originOf } from "../_lib/http";
+import { readOauthState } from "../_lib/owned";
 import { YT_STATE, youtubeConfigured, youtubeCookie, youtubeRedirect } from "../_lib/youtube";
 
 export async function GET(request: Request): Promise<Response> {
@@ -10,7 +11,7 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const expected = readCookie(request, YT_STATE);
+  const expected = readOauthState(request, YT_STATE, who.sub);
   if (!code || !state || !expected || state !== expected) {
     return Response.redirect(`${home}&youtube=denied`, 302);
   }
@@ -50,6 +51,7 @@ export async function GET(request: Request): Promise<Response> {
       location: `${home}&youtube=connected`,
       "set-cookie": youtubeCookie(
         {
+          owner: who.sub,
           access: token.access_token,
           refresh: token.refresh_token,
           expires: Date.now() + (token.expires_in ?? 3600) * 1000,

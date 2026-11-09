@@ -1,5 +1,6 @@
 import { guardSensitive } from "../_lib/auth";
-import { json, originOf, randomState, setCookie } from "../_lib/http";
+import { json, originOf, randomState } from "../_lib/http";
+import { writeOauthState } from "../_lib/owned";
 import { TT_STATE, tiktokConfigured } from "../_lib/tiktok";
 
 export async function GET(request: Request): Promise<Response> {
@@ -22,7 +23,7 @@ export async function GET(request: Request): Promise<Response> {
     status: 302,
     headers: {
       location: url.toString(),
-      "set-cookie": setCookie(TT_STATE, state, request, 600),
+      "set-cookie": writeOauthState(TT_STATE, state, gate.sub, request),
       "cache-control": "private, no-store",
     },
   });
