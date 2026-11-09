@@ -1,7 +1,10 @@
+import { guardSensitive } from "../_lib/auth";
 import { json } from "../_lib/http";
 import { metaConfigured, metaMissing, readMeta } from "../_lib/meta";
 
 export async function GET(request: Request): Promise<Response> {
+  const gate = await guardSensitive(request, { rateKey: "status", limit: 60, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!metaConfigured()) return metaMissing();
   const session = readMeta(request);
   if (!session) {

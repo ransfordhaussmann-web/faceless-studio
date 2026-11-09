@@ -1,3 +1,4 @@
+import { requireSignedIn } from "../_lib/auth";
 import { originOf, readCookie } from "../_lib/http";
 import { graphGet, META_STATE, metaConfigured, metaCookie, metaRedirect } from "../_lib/meta";
 
@@ -12,6 +13,8 @@ type Pages = { data?: Page[] };
 
 export async function GET(request: Request): Promise<Response> {
   const home = `${originOf(request)}/?live=1`;
+  const who = await requireSignedIn(request);
+  if (who instanceof Response) return Response.redirect(`${home}&meta=signin`, 302);
   if (!metaConfigured()) return Response.redirect(`${home}&meta=missing`, 302);
   const url = new URL(request.url);
   const code = url.searchParams.get("code");

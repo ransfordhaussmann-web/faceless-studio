@@ -1,4 +1,5 @@
-import { json, sameOrigin } from "../_lib/http";
+import { guardSensitive } from "../_lib/auth";
+import { json } from "../_lib/http";
 import { GRAPH, graphGet, graphPost, isMetaUploadHost, metaConfigured, readMeta } from "../_lib/meta";
 
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -19,7 +20,8 @@ async function waitForReady(id: string, token: string): Promise<string> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!sameOrigin(request)) return json({ error: "bad origin" }, 403);
+  const gate = await guardSensitive(request, { rateKey: "publish", limit: 6, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!metaConfigured()) {
     return json(
       { error: "Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in Cursor Secrets, then connect again." },

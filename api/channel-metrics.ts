@@ -1,3 +1,4 @@
+import { guardSensitive } from "./_lib/auth";
 import { json } from "./_lib/http";
 import { GRAPH, metaConfigured, readMeta } from "./_lib/meta";
 import { displayName, readSession, refreshSession, sessionCookie, tiktokConfigured } from "./_lib/tiktok";
@@ -436,6 +437,8 @@ async function metaLive(
 }
 
 export async function GET(request: Request): Promise<Response> {
+  const gate = await guardSensitive(request, { rateKey: "metrics", limit: 20, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   const period = periodRange();
   const [youtube, tiktok, meta] = await Promise.all([
     youtubeLive(request, period.from, period.to),

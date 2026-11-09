@@ -1,4 +1,5 @@
-import { json, sameOrigin } from "../_lib/http";
+import { guardSensitive } from "../_lib/auth";
+import { json } from "../_lib/http";
 import {
   isTikTokUploadHost,
   missingConfig,
@@ -32,7 +33,8 @@ async function tiktok(path: string, access: string, body?: unknown): Promise<Tik
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!sameOrigin(request)) return json({ error: "bad origin" }, 403);
+  const gate = await guardSensitive(request, { rateKey: "publish", limit: 6, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!tiktokConfigured()) return missingConfig();
   const session = readSession(request);
   if (!session) return json({ error: "Connect TikTok in Channel first." }, 401);

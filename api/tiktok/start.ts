@@ -1,7 +1,10 @@
+import { guardSensitive } from "../_lib/auth";
 import { json, originOf, randomState, setCookie } from "../_lib/http";
 import { TT_STATE, tiktokConfigured } from "../_lib/tiktok";
 
 export async function GET(request: Request): Promise<Response> {
+  const gate = await guardSensitive(request, { rateKey: "oauth-start", limit: 10, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!tiktokConfigured()) {
     return json(
       { error: "Add TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET in Cursor Secrets, then connect again." },

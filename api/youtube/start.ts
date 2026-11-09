@@ -1,7 +1,10 @@
+import { guardSensitive } from "../_lib/auth";
 import { json, randomState, setCookie } from "../_lib/http";
 import { YT_STATE, youtubeConfigured, youtubeRedirect } from "../_lib/youtube";
 
 export async function GET(request: Request): Promise<Response> {
+  const gate = await guardSensitive(request, { rateKey: "oauth-start", limit: 10, windowMs: 60_000 });
+  if (gate instanceof Response) return gate;
   if (!youtubeConfigured()) {
     return json(
       { error: "Add YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in Cursor Secrets, then connect again." },

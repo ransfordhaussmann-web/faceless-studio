@@ -1,8 +1,11 @@
+import { requireSignedIn } from "../_lib/auth";
 import { originOf, readCookie } from "../_lib/http";
 import { YT_STATE, youtubeConfigured, youtubeCookie, youtubeRedirect } from "../_lib/youtube";
 
 export async function GET(request: Request): Promise<Response> {
   const home = `${originOf(request)}/?live=1`;
+  const who = await requireSignedIn(request);
+  if (who instanceof Response) return Response.redirect(`${home}&youtube=signin`, 302);
   if (!youtubeConfigured()) return Response.redirect(`${home}&youtube=missing`, 302);
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
